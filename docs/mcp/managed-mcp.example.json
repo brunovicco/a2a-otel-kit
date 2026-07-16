@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_MCP_TOKEN}"
+      },
+      "timeout": 60000
+    },
+    "internal-engineering": {
+      "type": "http",
+      "url": "https://mcp.engineering.example.com/mcp",
+      "timeout": 60000
+    }
+  }
+}
