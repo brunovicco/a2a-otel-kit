@@ -1,9 +1,9 @@
 # a2a-otel-kit
 
 A small, typed Python 3.13 library that standardizes OpenTelemetry initialization, W3C
-trace-context propagation, structured JSON logging, and privacy-safe telemetry attributes for
-future A2A agents and MCP services. It is the reusable observability foundation extracted from
-the `multi-agent-credit-desk` project so that it can be pip-installed independently and versioned
+trace-context propagation, structured JSON logging, and privacy-safe telemetry attributes for A2A
+agents and MCP services. It is the reusable observability foundation extracted from the
+`multi-agent-credit-desk` project so that it can be pip-installed independently and versioned
 across multiple services.
 
 ## Scope
@@ -19,6 +19,8 @@ This library provides:
 - Deterministic, allowlist-based sanitization of telemetry attributes (`sanitize_attributes`).
 - A versioned structured-event schema (`StructuredEvent`, `schema_version`, `event_name`,
   `event_outcome`).
+- An optional, concrete OpenTelemetry integration for the official A2A Python SDK
+  (`adapters/a2a.py`, requires the `a2a` extra) - see [A2A integration](#a2a-integration).
 
 This library **emits standard OTLP over HTTP and nothing else**. It does not deploy, configure,
 or depend on an OTel Collector, Datadog, or Langfuse - those are operated by whatever process
@@ -30,8 +32,9 @@ imported here.
 ```text
 src/a2a_otel_kit/
 ├── domain/         # sanitize_attributes(), StructuredEvent - pure Python, no OTel/pydantic import
-├── application/     # ObservabilitySettings, TracerLifecycle port
-├── adapters/        # OpenTelemetry SDK wiring (tracing.py), W3C propagation (propagation.py)
+├── application/     # ObservabilitySettings, TracerLifecycle/ObservabilityFacade ports
+├── adapters/        # OpenTelemetry SDK wiring (tracing.py), W3C propagation (propagation.py),
+│                    # optional A2A SDK integration (a2a.py, requires the `a2a` extra)
 └── entrypoints/      # configure_logging(), the Observability composition root/facade
 ```
 
@@ -132,6 +135,71 @@ with continue_trace(carrier):
 `Mapping`/`MutableMapping[str, str]` carriers and never mutate OpenTelemetry's global propagator
 registry, so a future HTTP, gRPC, or queue-header adapter can reuse them directly.
 
+## A2A integration
+
+Optional: requires the `a2a` extra.
+
+```bash
+uv add "a2a-otel-kit[a2a]"
+```
+
+Verified against `a2a-sdk` 1.1.1. Supported extension points:
+
+- **Client (outbound):** `a2a.client.client.Client` - `TracingClient` wraps a concrete client
+  instance and delegates every method, injecting the current W3C trace context into
+  `ClientCallContext.service_parameters` (the field the SDK's own `get_http_args()` copies into
+  outbound HTTP headers for the JSON-RPC and REST transports).
+- **Server (inbound, JSON-RPC/REST only):** `a2a.server.request_handlers.request_handler.RequestHandler` -
+  `TracingRequestHandler` wraps a concrete handler and extracts a W3C trace context from
+  `ServerCallContext.state['headers']` (populated with the real inbound HTTP headers by the SDK's
+  `DefaultServerCallContextBuilder`).
+
+```python
+# Outbound (a service calling another agent):
+from a2a_otel_kit.adapters.a2a import TracingClient
+
+client = TracingClient.wrap(real_client, observability)  # real_client: a2a.client.client.Client
+async for event in client.send_message(request):
+    ...  # traceparent/tracestate are already injected into the outbound call
+
+# Inbound (an agent's own A2A server):
+from a2a_otel_kit.adapters.a2a import TracingRequestHandler
+
+request_handler = TracingRequestHandler.wrap(real_handler, observability)  # wraps e.g. DefaultRequestHandler
+# pass request_handler to the FastAPI app builder as usual; the caller's trace context is
+# extracted automatically before each method runs.
+```
+
+`TracingClient.wrap()`/`TracingRequestHandler.wrap()` are idempotent: wrapping an already-wrapped
+instance returns it unchanged, so calling `wrap()` more than once never produces duplicate spans.
+
+**Captured:** a fixed, low-cardinality span name per operation (e.g. `"a2a.client.send_message"`,
+built from the SDK's own method name, never from remote-supplied data), one `operation` attribute
+(the same fixed name), and a `started`/`completed`/`failed` structured event per operation, all
+three sharing the operation's own `trace_id`/`span_id`. Outbound (`TracingClient`) spans use
+`SpanKind.CLIENT`; inbound (`TracingRequestHandler`) spans use `SpanKind.SERVER`. A failed
+operation's span gets an ERROR status with no description; the original exception or cancellation
+always propagates to the caller unchanged.
+
+**Streaming cleanup and terminal outcomes:** `send_message`, `subscribe`, `on_message_send_stream`,
+and `on_subscribe_to_task` each own exactly one inner iterator and close it deterministically -
+via exhaustion, an exception, an explicit `aclose()`, or task cancellation alike - never relying
+on garbage collection. Exactly one terminal event is ever emitted per operation: full stream
+exhaustion is `completed`/SUCCESS; anything else (an exception, an early `aclose()`, or
+cancellation) is `failed`/ERROR. See `docs/adr/0003-a2a-request-response-wrapping.md` for the full
+rationale, including why the SDK's own SSE reader independently arrived at the same
+explicit-ownership approach for its underlying HTTP connection.
+
+**Explicitly excluded:** message bodies, task/artifact content, agent names, URLs, header values,
+and exception messages are never recorded in a span or event - a failure is signaled by status and
+event outcome alone.
+
+**Not covered:** the gRPC transport builds its `ServerCallContext` from gRPC servicer context, not
+Starlette headers, so inbound trace-context extraction is unverified for gRPC-originated requests
+(wrapping a gRPC-backed handler still produces spans/events; only continuity across that specific
+transport boundary is unverified). See `docs/adr/0003-a2a-request-response-wrapping.md` for why
+the SDK's own `ClientCallInterceptor` hook was not used for span lifetime.
+
 ## Privacy guarantees
 
 - Telemetry attributes are **deny-by-default**: `sanitize_attributes()` keeps only allowlisted
@@ -156,10 +224,12 @@ no path to do otherwise.
 
 Deliberately out of scope for this library:
 
-- **A2A/MCP SDK integration.** No concrete A2A or MCP SDK is depended on here. The
-  carrier-based propagation helpers above are protocol-neutral so a future adapter (in a
-  consuming service) can wire them into a specific transport once a pinned SDK and a verified
-  integration point exist.
+- **MCP SDK integration.** No MCP SDK is depended on here. This milestone added the optional
+  A2A integration only (see [A2A integration](#a2a-integration)); MCP support remains deferred
+  to a future milestone with its own verified extension point.
+- **gRPC trace-context continuity for A2A.** `TracingRequestHandler` extracts inbound trace
+  context from Starlette request headers, which the gRPC transport does not populate the same
+  way; gRPC-originated requests still get spans/events, just not verified context continuity.
 - **Vendor backends (Datadog, Langfuse).** This library emits OTLP and stops there. Fan-out to
   vendor backends is the responsibility of a central OTel Collector operated outside this
   library - see the sibling `multi-agent-credit-desk` repository's

@@ -90,6 +90,7 @@ def sanitize_attributes(
 class StructuredEventOutcome(StrEnum):
     """Closed set of outcomes a structured event may report."""
 
+    STARTED = "started"
     SUCCESS = "success"
     FAILURE = "failure"
     ERROR = "error"

@@ -74,6 +74,7 @@ class Observability:
         *,
         kind: SpanKind = SpanKind.INTERNAL,
         attributes: Mapping[str, object] | None = None,
+        record_exception: bool = True,
     ) -> AbstractContextManager[Span]:
         """Start a span as the current span for the duration of a ``with`` block.
 
@@ -81,13 +82,26 @@ class Observability:
         need to branch on whether tracing is enabled. Attributes are sanitized through the same
         allowlist as :meth:`emit_event`; span attributes cannot carry ``None``, so a sanitized
         ``None`` value is dropped rather than sent as an empty attribute.
+
+        ``record_exception`` defaults to OpenTelemetry's own default (``True``): the span
+        automatically captures the exception's type, message, and stack trace as a span event,
+        and sets an ERROR status with that message as its description. Pass ``False`` when
+        wrapping a boundary whose exceptions may carry content this library must not record
+        verbatim (for example, a remote peer's error message) - the caller remains responsible
+        for setting a safe status explicitly in that case.
         """
         span_attributes = {
             key: value
             for key, value in sanitize_attributes(attributes).items()
             if value is not None
         }
-        return self._tracer.start_as_current_span(name, kind=kind, attributes=span_attributes)
+        return self._tracer.start_as_current_span(
+            name,
+            kind=kind,
+            attributes=span_attributes,
+            record_exception=record_exception,
+            set_status_on_exception=record_exception,
+        )
 
     def emit_event(
         self,

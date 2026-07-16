@@ -32,6 +32,10 @@ APIs, or accept end-user input directly.
   appears in `tests/`.
 - **Logging and tracing restrictions:** see `docs/LLM_OBSERVABILITY.md`. No vendor backend, no
   content-capture flag, and no prompt/completion field exist in this library's public API.
+- **Optional A2A integration** (`adapters/a2a.py`): records only a fixed span name per operation
+  and one `operation` attribute (the same fixed name, never remote-supplied data); message
+  bodies, task/artifact content, agent names, URLs, header values, and exception messages are
+  never recorded. See `README.md#a2a-integration`.
 - **Data-subject deletion/anonymization:** not applicable; this library does not store or
   identify data subjects.
 - **External processors:** none directly. A consuming project's OTel Collector and its
