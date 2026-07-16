@@ -1,6 +1,6 @@
 [project]
 name = "a2a-otel-kit"
-version = "0.2.0"
+version = "0.3.0"
 description = "Vendor-neutral OpenTelemetry, W3C propagation, and structured-logging foundation for A2A agents and MCP services"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
@@ -18,10 +18,15 @@ dependencies = [
 a2a = [
     "a2a-sdk>=1.1,<2.0",
 ]
+# Optional MCP Streamable HTTP integration (adapters/mcp.py).
+mcp = [
+    "mcp>=1.28,<2.0",
+]
 
 [dependency-groups]
 dev = [
     "a2a-sdk>=1.1,<2.0",
+    "mcp>=1.28,<2.0",
     "bandit[toml]>=1.8",
     "mypy>=1.16",
     "pip-audit>=2.9",

@@ -21,6 +21,8 @@ This library provides:
   `event_outcome`).
 - An optional, concrete OpenTelemetry integration for the official A2A Python SDK
   (`adapters/a2a.py`, requires the `a2a` extra) - see [A2A integration](#a2a-integration).
+- Optional Streamable HTTP instrumentation for the official MCP Python SDK
+  (`adapters/mcp.py`, requires the `mcp` extra) - see [MCP integration](#mcp-integration).
 
 This library **emits standard OTLP over HTTP and nothing else**. It does not deploy, configure,
 or depend on an OTel Collector, Datadog, or Langfuse - those are operated by whatever process
@@ -200,6 +202,35 @@ Starlette headers, so inbound trace-context extraction is unverified for gRPC-or
 transport boundary is unverified). See `docs/adr/0003-a2a-request-response-wrapping.md` for why
 the SDK's own `ClientCallInterceptor` hook was not used for span lifetime.
 
+## MCP integration
+
+Optional: `uv add "a2a-otel-kit[mcp]"`. Verified against `mcp` 1.28.1 and limited to public
+Streamable HTTP boundaries. Wrap an HTTPX transport and pass its client to
+`streamable_http_client(http_client=client)`; wrap the ASGI app returned by
+`FastMCP.streamable_http_app()` on the server:
+
+```python
+import httpx
+from mcp.client.streamable_http import streamable_http_client
+
+from a2a_otel_kit.adapters.mcp import TracingASGIMiddleware, TracingAsyncTransport
+
+transport = TracingAsyncTransport.wrap(httpx.AsyncHTTPTransport(), observability)
+mcp_asgi_app = TracingASGIMiddleware.wrap(fastmcp.streamable_http_app(), observability)
+
+async with httpx.AsyncClient(transport=transport) as http_client:
+    async with streamable_http_client(url, http_client=http_client) as streams:
+        ...  # use the MCP session while both contexts own their resources
+```
+
+Outbound spans use `SpanKind.CLIENT`; inbound spans use `SpanKind.SERVER`. Only fixed operation
+names and the fixed `operation` attribute are recorded. The adapter propagates only `traceparent`
+and `tracestate`; it never reads MCP arguments, results, request/response bodies, arbitrary header
+values, URLs, or exception text. Setup is explicit and both `wrap()` methods are idempotent.
+HTTP 2xx/3xx responses complete successfully; HTTP 4xx/5xx responses produce an ERROR span and
+one `failed` event without reading the response body or recording the status response content.
+Stdio and legacy SSE transports are not supported. See ADR-0004.
+
 ## Privacy guarantees
 
 - Telemetry attributes are **deny-by-default**: `sanitize_attributes()` keeps only allowlisted
@@ -224,9 +255,8 @@ no path to do otherwise.
 
 Deliberately out of scope for this library:
 
-- **MCP SDK integration.** No MCP SDK is depended on here. This milestone added the optional
-  A2A integration only (see [A2A integration](#a2a-integration)); MCP support remains deferred
-  to a future milestone with its own verified extension point.
+- **Other MCP transports.** The optional MCP adapter supports Streamable HTTP only. Stdio and
+  legacy SSE do not expose the same HTTP propagation boundary and remain out of scope.
 - **gRPC trace-context continuity for A2A.** `TracingRequestHandler` extracts inbound trace
   context from Starlette request headers, which the gRPC transport does not populate the same
   way; gRPC-originated requests still get spans/events, just not verified context continuity.

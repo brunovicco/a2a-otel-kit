@@ -36,6 +36,9 @@ APIs, or accept end-user input directly.
   and one `operation` attribute (the same fixed name, never remote-supplied data); message
   bodies, task/artifact content, agent names, URLs, header values, and exception messages are
   never recorded. See `README.md#a2a-integration`.
+- **Optional MCP integration** (`adapters/mcp.py`): records only fixed Streamable HTTP operation
+  names and the fixed `operation` attribute. It propagates only W3C trace context and never reads
+  MCP arguments/results, HTTP bodies, arbitrary header values, URLs, or exception messages.
 - **Data-subject deletion/anonymization:** not applicable; this library does not store or
   identify data subjects.
 - **External processors:** none directly. A consuming project's OTel Collector and its
