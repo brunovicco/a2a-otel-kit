@@ -1,0 +1,235 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Annotated release tag to publish, e.g. v0.3.1. Must already exist; never a branch."
+        required: true
+        type: string
+      version:
+        description: "Release version to publish, e.g. 0.3.1. Must match pyproject.toml at the tag commit."
+        required: true
+        type: string
+
+# Read-only by default. Elevated permissions are granted per-job, only where required.
+permissions:
+  contents: read
+
+# One release attempt per requested ref at a time; never cancel a publish already in flight.
+# Job outputs do not exist yet when this expression is evaluated, so it is keyed on the raw
+# input; that is safe here because concurrency.group is a scheduling label, never shell or code.
+concurrency:
+  group: release-${{ inputs.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_REF: ${{ inputs.ref }}
+      RELEASE_VERSION: ${{ inputs.version }}
+    outputs:
+      # The immutable commit SHA the requested tag peels to, and the normalized short tag name
+      # (e.g. "v0.3.1"). Every later job checks out commit_sha, never inputs.ref again, and
+      # independently re-verifies that tag still resolves to commit_sha before doing anything
+      # privileged -- this is the sole binding between "what was validated" and "what gets built,
+      # published, and released", closing the TOCTOU gap of trusting a mutable tag name twice.
+      commit_sha: ${{ steps.validate.outputs.commit_sha }}
+      tag: ${{ steps.validate.outputs.tag }}
+    steps:
+      - name: Check out requested ref
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0 # full history + tags: required to tell an annotated tag from a lightweight one
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.28"
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Validate ref, version, tag type, clean tree, and bind to the tag's commit SHA
+        id: validate
+        run: >
+          uv run --no-project python scripts/validate_release_ref.py
+          --ref "$RELEASE_REF" --version "$RELEASE_VERSION" --github-output "$GITHUB_OUTPUT"
+
+  build:
+    name: Build release artifacts
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      VALIDATED_SHA: ${{ needs.validate.outputs.commit_sha }}
+      VALIDATED_TAG: ${{ needs.validate.outputs.tag }}
+    steps:
+      - name: Check out the validated commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.validate.outputs.commit_sha }} # the validated SHA, never inputs.ref
+          fetch-depth: 0 # tags are needed again below to re-check the tag has not moved
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.28"
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Re-verify the tag still points at the validated commit
+        run: >
+          uv run --no-project python scripts/validate_release_ref.py
+          --ref "refs/tags/$VALIDATED_TAG" --expect-commit "$VALIDATED_SHA"
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Project quality gate
+        run: uv run python scripts/quality_gate.py
+
+      - name: Build wheel and sdist
+        run: uv build --out-dir dist
+
+      - name: Verify the built artifacts
+        run: uv run python scripts/verify_release_artifacts.py --dist-dir dist --version "$RELEASE_VERSION"
+
+      - name: Generate artifact hashes
+        run: (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish to PyPI
+    needs: [validate, build]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VALIDATED_SHA: ${{ needs.validate.outputs.commit_sha }}
+      VALIDATED_TAG: ${{ needs.validate.outputs.tag }}
+    environment:
+      name: pypi
+      url: https://pypi.org/project/a2a-otel-kit/${{ inputs.version }}/
+    permissions:
+      contents: read
+      id-token: write # required for PyPI Trusted Publishing OIDC; granted only in this job
+    steps:
+      - name: Check out the validated commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.validate.outputs.commit_sha }} # the validated SHA, never inputs.ref
+          fetch-depth: 0 # tags are needed again below to re-check the tag has not moved
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.28"
+          enable-cache: false
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Download the exact verified artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-dist
+          path: dist/
+
+      - name: Remove the hash manifest before publishing (not a distribution file)
+        run: rm -f dist/SHA256SUMS
+
+      - name: Re-verify the tag immediately before publishing
+        run: >
+          uv run --no-project python scripts/validate_release_ref.py
+          --ref "refs/tags/$VALIDATED_TAG" --expect-commit "$VALIDATED_SHA"
+
+      - name: Publish to PyPI via Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+        with:
+          # No skip-existing: a duplicate version upload must fail loudly, not succeed silently.
+          verbose: true
+          print-hash: true
+
+  github-release:
+    name: Create GitHub Release
+    needs: [validate, publish] # validate: to read its outputs; publish: to run only after it succeeds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      VALIDATED_SHA: ${{ needs.validate.outputs.commit_sha }}
+      VALIDATED_TAG: ${{ needs.validate.outputs.tag }}
+    permissions:
+      contents: write # create the Release and upload assets
+      id-token: write # mint the OIDC token for provenance attestation
+      attestations: write # persist the attestation
+      artifact-metadata: write # create the artifact storage record
+    steps:
+      - name: Check out the validated commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.validate.outputs.commit_sha }} # the validated SHA, never inputs.ref
+          fetch-depth: 0 # tags are needed again below to re-check the tag has not moved
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.28"
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Re-verify the tag still points at the validated commit
+        run: >
+          uv run --no-project python scripts/validate_release_ref.py
+          --ref "refs/tags/$VALIDATED_TAG" --expect-commit "$VALIDATED_SHA"
+
+      - name: Download the exact published artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-dist
+          path: dist/
+
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          # One glob per line (official multiline subject-path syntax). SHA256SUMS is a hash
+          # manifest, not a Python distribution, and is deliberately not attested here.
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Published to PyPI: https://pypi.org/project/a2a-otel-kit/${RELEASE_VERSION}/
+
+          See CHANGELOG.md for release notes: https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md"
+          gh release create "$VALIDATED_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$VALIDATED_TAG" \
+            --notes "$notes" \
+            dist/*.whl dist/*.tar.gz dist/SHA256SUMS

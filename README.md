@@ -281,3 +281,23 @@ uv run python scripts/quality_gate.py
 
 See `AGENTS.md` for the full engineering contract and `docs/ARCHITECTURE.md` for the enforced
 dependency rules.
+
+## Packaging and releases
+
+Build and verify the distributable wheel and sdist locally:
+
+```bash
+uv build --out-dir dist
+uv run python scripts/verify_release_artifacts.py --dist-dir dist
+```
+
+This inspects both artifacts' contents and metadata (including the `a2a`/`mcp` extras) and
+installs the wheel into isolated temporary virtual environments to smoke-test imports with
+network I/O blocked. Releases are published to PyPI through a GitHub Actions workflow using
+[PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) - no PyPI token is stored in
+this repository. See `docs/DEVELOPMENT.md#releasing` for the maintainer runbook, the required
+GitHub environment and PyPI Trusted Publisher configuration, and rollback/yank guidance.
+
+`v0.3.0` is tagged in git but predates this project's release tooling (no `LICENSE`, no release
+workflow) and must never be published to PyPI; `v0.3.1` is the first version intended for
+publication. PyPI publication status for each version is recorded in `CHANGELOG.md`.

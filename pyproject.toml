@@ -1,9 +1,33 @@
 [project]
 name = "a2a-otel-kit"
-version = "0.3.0"
+version = "0.3.1"
 description = "Vendor-neutral OpenTelemetry, W3C propagation, and structured-logging foundation for A2A agents and MCP services"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Bruno Vicco", email = "bfvicco@gmail.com" }]
 requires-python = ">=3.13,<3.15"
+keywords = [
+    "a2a",
+    "mcp",
+    "observability",
+    "opentelemetry",
+    "structured-logging",
+    "tracing",
+    "w3c-trace-context",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Logging",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
+]
 dependencies = [
     "opentelemetry-api>=1.43,<2.0",
     "opentelemetry-exporter-otlp-proto-http>=1.43,<2.0",
@@ -12,6 +36,12 @@ dependencies = [
     "pydantic-settings>=2.8",
     "structlog>=25.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/brunovicco/a2a-otel-kit"
+Repository = "https://github.com/brunovicco/a2a-otel-kit"
+Issues = "https://github.com/brunovicco/a2a-otel-kit/issues"
+Changelog = "https://github.com/brunovicco/a2a-otel-kit/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Optional A2A SDK integration (adapters/a2a.py); see README.md#a2a-integration.
@@ -32,15 +62,31 @@ dev = [
     "pip-audit>=2.9",
     "pytest>=8.4",
     "pytest-cov>=6.2",
+    "pyyaml>=6.0.3",
     "ruff>=0.12",
+    "types-pyyaml>=6.0.12.20260518",
 ]
 
 [build-system]
-requires = ["hatchling"]
+# Exact pin, not a range: uv builds this package in an isolated environment that is not
+# constrained by uv.lock the way ordinary dependencies are, so an unpinned or ranged build
+# backend could silently float to a new Hatchling release between builds. Verified against
+# live PyPI (see docs/DEVELOPMENT.md#build-backend) and supports Python 3.13/3.14 and PEP 639.
+requires = ["hatchling==1.31.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/a2a_otel_kit"]
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "src/a2a_otel_kit",
+    "tests",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "pyproject.toml",
+]
 
 [tool.ruff]
 target-version = "py313"
