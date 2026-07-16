@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "issue-tracker": {
+      "type": "http",
+      "url": "${ISSUE_TRACKER_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${ISSUE_TRACKER_MCP_TOKEN}"
+      },
+      "timeout": 60000
+    },
+    "company-tools": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "company-mcp==1.2.3",
+        "company-mcp"
+      ],
+      "env": {
+        "COMPANY_API_URL": "${COMPANY_API_URL}"
+      },
+      "timeout": 60000
+    }
+  }
+}
