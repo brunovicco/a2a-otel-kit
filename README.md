@@ -359,7 +359,3 @@ network I/O blocked. Releases are published to PyPI through a GitHub Actions wor
 [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) - no PyPI token is stored in
 this repository. See `docs/DEVELOPMENT.md#releasing` for the maintainer runbook, the required
 GitHub environment and PyPI Trusted Publisher configuration, and rollback/yank guidance.
-
-`v0.3.0` is tagged in git but predates this project's release tooling (no `LICENSE`, no release
-workflow) and must never be published to PyPI. Publication began with `v0.3.1`; subsequent
-versions use the same immutable-tag and Trusted Publishing process.

@@ -1,6 +1,6 @@
 [project]
 name = "a2a-otel-kit"
-version = "0.4.1"
+version = "0.4.2"
 description = "Vendor-neutral OpenTelemetry, W3C propagation, and structured-logging foundation for A2A agents and MCP services"
 readme = "README.md"
 license = "MIT"

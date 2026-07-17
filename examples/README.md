@@ -21,7 +21,7 @@ def otlp_headers() -> dict[str, str]:
 
 settings = ObservabilitySettings(
     service_name="example-agent",
-    service_version="0.4.1",
+    service_version="0.4.2",
     environment="local",
     enabled=True,
     otlp_endpoint="http://127.0.0.1:4318/v1/traces",

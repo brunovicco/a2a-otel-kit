@@ -270,7 +270,7 @@ def test_current_build_passes_the_complete_artifact_verifier(tmp_path: Path) -> 
     expected_version = verify.read_project_version(repo_root)
     wheel_path, sdist_path = verify.find_artifacts(tmp_path)
 
-    assert expected_version == "0.4.1"
-    assert wheel_path.name == f"{DIST_NAME}-0.4.1-py3-none-any.whl"
+    assert expected_version == "0.4.2"
+    assert wheel_path.name == f"{DIST_NAME}-0.4.2-py3-none-any.whl"
     assert verify.inspect_wheel(wheel_path, expected_version) == []
     assert verify.inspect_sdist(sdist_path, expected_version) == []

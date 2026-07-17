@@ -14,6 +14,12 @@ independently.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-17
+
+### Changed
+
+- Kept historical release restrictions in maintainer documentation instead of the public README.
+
 ## [0.4.1] - 2026-07-17
 
 ### Fixed
