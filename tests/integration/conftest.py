@@ -77,7 +77,7 @@ def traced_observability(
     observability = Observability.configure(
         ObservabilitySettings(
             service_name=f"{request.node.name}-integration",
-            service_version="0.4.0",
+            service_version="0.4.1",
             environment="test",
             enabled=True,
             otlp_endpoint="http://127.0.0.1:4318",

@@ -24,11 +24,28 @@ def _load_pyproject() -> dict[str, Any]:
         return tomllib.load(handle)
 
 
-def test_project_version_is_0_4_0() -> None:
-    """The package version matches the current operability milestone."""
+def test_project_version_is_0_4_1() -> None:
+    """The package version matches the documentation correction release."""
     project = _load_pyproject()
 
-    assert project["project"]["version"] == "0.4.0"
+    assert project["project"]["version"] == "0.4.1"
+
+
+def test_readme_integration_commands_select_integration_tests() -> None:
+    """README commands must override pytest's project-wide unit-only marker."""
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert readme.count("--no-cov -m integration") == 2
+
+
+@pytest.mark.parametrize("relative_path", ["README.md", ".env.example", "examples/README.md"])
+def test_documented_collector_endpoints_target_otlp_traces(relative_path: str) -> None:
+    """Every local Collector example must use the exporter's concrete traces endpoint."""
+    text = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+
+    for line in text.splitlines():
+        if "4318" in line and "otlp_endpoint" in line.lower():
+            assert "/v1/traces" in line, f"{relative_path} has incomplete OTLP endpoint: {line}"
 
 
 def test_build_system_pins_hatchling_to_an_exact_version() -> None:

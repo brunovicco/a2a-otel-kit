@@ -26,7 +26,7 @@ def test_collector_receives_exported_span() -> None:
     observability = Observability.configure(
         ObservabilitySettings(
             service_name="a2a-otel-kit-collector-integration",
-            service_version="0.4.0",
+            service_version="0.4.1",
             environment="integration",
             enabled=True,
             otlp_endpoint=endpoint,

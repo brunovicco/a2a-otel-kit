@@ -104,7 +104,7 @@ flush/shutdown lifecycle.
   positive receipt by finding the emitted span in a Collector file-exporter output, rather than
   treating endpoint reachability as success.
 - CI tests the minimum supported A2A/MCP SDK versions and the newest releases inside the declared
-  upper bounds on Python 3.13.
+  upper bounds on Python 3.13 and 3.14.
 
 ## Deliberate exclusions
 

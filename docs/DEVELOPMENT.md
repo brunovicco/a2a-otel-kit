@@ -93,11 +93,8 @@ token stored anywhere in this repository or its GitHub configuration.
 project's release tooling existed, so its tree has no `LICENSE`, no PEP 639 license metadata, and
 not even `release.yml` itself; publishing it would ship a non-compliant package, and its tag
 cannot be amended without moving it, which is forbidden (see "Why tags must never be moved"
-below). `v0.3.1` is the first version intended for PyPI publication. Because this is the first
-release, the usual "Cutting a release" sequence below starts from the review/merge of the
-release-readiness change (this one) rather than from an existing tagged commit: review and merge
-→ create the annotated `v0.3.1` tag on the merged commit → push it → dispatch `release.yml` for
-`v0.3.1`. Every later release follows the same "Cutting a release" steps unchanged.
+below). PyPI publication began with `v0.3.1`. All current and future releases follow the
+"Cutting a release" process below.
 
 ### What a release actually is
 
@@ -112,25 +109,22 @@ release-readiness change (this one) rather than from an existing tagged commit: 
 These three steps are ordered on purpose: tag → build → verify → publish to PyPI → GitHub Release.
 A GitHub Release is never created for a version that failed to publish.
 
-### One-time setup (maintainer, external to this repository)
+### Trusted Publisher configuration (maintainer, external to this repository)
 
-1. On PyPI, go to **Account settings → Publishing** (`https://pypi.org/manage/account/publishing/`)
-   and add a new pending GitHub publisher with these exact values:
+The project and its Trusted Publisher already exist. If the publisher must be audited or
+recreated, open the `a2a-otel-kit` project publishing settings on PyPI and use these exact values:
 
-   | Field | Value |
-   |---|---|
-   | PyPI Project Name | `a2a-otel-kit` |
-   | Owner | `brunovicco` |
-   | Repository name | `a2a-otel-kit` |
-   | Workflow name | `release.yml` |
-   | Environment name | `pypi` |
+| Field | Value |
+|---|---|
+| PyPI Project Name | `a2a-otel-kit` |
+| Owner | `brunovicco` |
+| Repository name | `a2a-otel-kit` |
+| Workflow name | `release.yml` |
+| Environment name | `pypi` |
 
-   This registers the publisher before the project exists on PyPI ("pending publisher"); the
-   project is created automatically on the first successful publish from a matching workflow run.
-2. On GitHub, go to **Settings → Environments** in `brunovicco/a2a-otel-kit` and create an
-   environment named exactly `pypi`. Add required reviewers (recommended: at least one maintainer)
-   so every publish needs explicit human approval before `release.yml`'s `publish` job runs. Do
-   not add any secrets to this environment - Trusted Publishing needs none.
+On GitHub, the repository environment must be named exactly `pypi`. Required reviewers are
+recommended so every publish needs explicit human approval before `release.yml`'s `publish` job
+runs. Do not add a PyPI token to this environment - Trusted Publishing needs none.
 
 Both configurations must match `release.yml` exactly (repository, workflow filename, environment
 name) or PyPI will reject the OIDC token and the `publish` job will fail closed.
@@ -139,7 +133,8 @@ name) or PyPI will reject the OIDC token and the `publish` job will fail closed.
 
 1. On `main`, with a clean working tree, set `version` in `pyproject.toml` to the new release
    version and update `CHANGELOG.md` (move the `[Unreleased]` entries under a new `## [X.Y.Z] -
-   YYYY-MM-DD` heading). Commit and merge this to `main` through the normal PR/quality-gate flow.
+   YYYY-MM-DD` heading, leaving an empty `[Unreleased]` section in place). Commit and merge this
+   to `main` through the normal PR/quality-gate flow.
 2. Tag the resulting commit on `main` with an **annotated** tag and push it:
 
    ```bash
@@ -158,14 +153,14 @@ name) or PyPI will reject the OIDC token and the `publish` job will fail closed.
    `pyproject.toml`; a mismatch, a non-tag ref, a lightweight tag, or a dirty tree all fail the
    `validate` job before anything is built.
 4. `validate` peels the tag to its commit SHA and publishes that SHA (and the normalized short tag
-   name, e.g. `v0.3.1`) as job outputs. Every later job checks out that SHA directly - never the
+   name, e.g. `vX.Y.Z`) as job outputs. Every later job checks out that SHA directly - never the
    raw `ref` input again - and independently re-verifies the tag still resolves to that same SHA
    before doing anything privileged, so a tag moved after validation (accidentally or maliciously)
    is caught rather than silently built or published.
 5. The workflow builds once from that commit, verifies the exact built artifacts, waits for the
    `pypi` environment approval, publishes via Trusted Publishing, and only then creates the GitHub
-   Release - using the validated short tag name (`gh release create v0.3.1 --verify-tag`, never
-   `refs/tags/v0.3.1`) - with the wheel, sdist, `SHA256SUMS`, and a build-provenance attestation
+   Release - using the validated short tag name (`gh release create vX.Y.Z --verify-tag`, never
+   `refs/tags/vX.Y.Z`) - with the wheel, sdist, `SHA256SUMS`, and a build-provenance attestation
    attached. No step rebuilds the package after `build` runs; `publish` and `github-release`
    download and reuse the exact artifacts `build` already verified.
 
@@ -203,7 +198,7 @@ PyPI does not support deleting or overwriting a published file. If a published v
 - Dispatching the workflow with the correct `ref`/`version` inputs.
 - Approving the `pypi` environment gate.
 - Yanking a broken release on PyPI, and deciding when to do so.
-- The one-time PyPI Trusted Publisher and GitHub environment setup above.
+- Repairing the PyPI Trusted Publisher or GitHub environment configuration if either changes.
 
 ## Container
 

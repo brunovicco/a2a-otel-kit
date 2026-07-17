@@ -11,8 +11,10 @@ contain by construction, for review by any project that consumes it.
 | Trace metadata (trace_id, span_id, span name, allowlisted attributes, timing) | Caller-supplied span names/attributes, OpenTelemetry SDK | Distributed tracing and correlation | Operational necessity (consuming project's basis) | OTLP/HTTP endpoint configured by the caller (typically a local OTel Collector) | Owned by the OTLP receiver, not this library | Owned by the OTLP receiver, not this library |
 | Structured log fields (service, environment, version, event_name, event_outcome, allowlisted attributes, trace_id/span_id) | Caller-supplied via `emit_event`/`configure_logging` | Application-level structured logging | Operational necessity (consuming project's basis) | Process stdout | Owned by the consuming project's log pipeline | Owned by the consuming project's log pipeline |
 
-No other data category exists in this library's scope: it does not read files, call external
-APIs, or accept end-user input directly.
+No other data category exists in this library's scope. It does not read application files or
+accept end-user input directly. When enabled, its only outbound application-runtime network call
+is OTLP/HTTP trace export to the caller-configured endpoint; optional A2A and MCP adapters observe
+calls made by their wrapped SDK boundaries without inspecting protocol content.
 
 ## OTLP authentication headers
 
@@ -35,9 +37,10 @@ process memory until shutdown; rotation requires replacing the observability ins
 - **Masking/tokenization:** sensitive-looking keys (password, token, authorization, cookie,
   api-key, credential, private-key, ssn, access-key patterns) are rejected outright rather than
   masked - see `is_sensitive_key()`/`sanitize_attributes()` in `domain/attributes.py`.
-- **Non-production data strategy:** this library's own test suite uses only synthetic
-  identifiers and an in-memory span exporter; no real endpoint, credential, or customer data
-  appears in `tests/`.
+- **Non-production data strategy:** all tests use synthetic identifiers and no real credential or
+  customer data. Unit tests use in-memory exporters and no network. Loopback integration tests
+  use ephemeral local TCP ports, and the opt-in Collector test exports only synthetic spans to a
+  local Compose fixture.
 - **Logging and tracing restrictions:** see `docs/LLM_OBSERVABILITY.md`. No vendor backend, no
   content-capture flag, and no prompt/completion field exist in this library's public API.
 - **Optional A2A integration** (`adapters/a2a.py`): records only a fixed span name per operation

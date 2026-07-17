@@ -24,9 +24,10 @@ This library provides:
 - Optional Streamable HTTP instrumentation for the official MCP Python SDK
   (`adapters/mcp.py`, requires the `mcp` extra) - see [MCP integration](#mcp-integration).
 
-This library **emits standard OTLP over HTTP and nothing else**. It does not deploy, configure,
-or depend on an OTel Collector, Datadog, or Langfuse - those are operated by whatever process
-consumes this library (see [Limitations](#limitations-and-deferred-work)). No vendor SDK is
+This library exports traces exclusively through standard OTLP over HTTP and writes structured
+logs to the configured process stream. It does not deploy, configure, or require an OTel
+Collector, Datadog, or Langfuse at runtime - those are operated by whatever process consumes this
+library (see [Limitations](#limitations-and-deferred-work)). No observability-vendor SDK is
 imported here.
 
 ## Architecture
@@ -79,7 +80,7 @@ settings = ObservabilitySettings(
     service_version="0.1.0",
     environment="local",
     enabled=True,
-    otlp_endpoint="http://localhost:4318",  # a local OTel Collector, not a vendor endpoint
+    otlp_endpoint="http://localhost:4318/v1/traces",  # local Collector OTLP/HTTP traces endpoint
 )
 observability = Observability.configure(settings)
 ```
@@ -160,7 +161,8 @@ Optional: requires the `a2a` extra.
 uv add "a2a-otel-kit[a2a]"
 ```
 
-Verified against `a2a-sdk` 1.1.1. Supported extension points:
+The supported `a2a-sdk` range is `>=1.1,<2.0`; CI exercises its minimum and newest bounded
+resolutions. Supported extension points:
 
 - **Client (outbound):** `a2a.client.client.Client` - `TracingClient` wraps a concrete client
   instance and delegates every method, injecting the current W3C trace context into
@@ -219,8 +221,9 @@ the SDK's own `ClientCallInterceptor` hook was not used for span lifetime.
 
 ## MCP integration
 
-Optional: `uv add "a2a-otel-kit[mcp]"`. Verified against `mcp` 1.28.1 and limited to public
-Streamable HTTP boundaries. Wrap an HTTPX transport and pass its client to
+Optional: `uv add "a2a-otel-kit[mcp]"`. The supported `mcp` range is `>=1.28,<2.0`; CI exercises
+its minimum and newest bounded resolutions. Integration is limited to public Streamable HTTP
+boundaries. Wrap an HTTPX transport and pass its client to
 `streamable_http_client(http_client=client)`; wrap the ASGI app returned by
 `FastMCP.streamable_http_app()` on the server:
 
@@ -253,7 +256,9 @@ server routes and FastMCP Streamable HTTP. They use only local ephemeral ports a
 external service:
 
 ```bash
-uv run pytest tests/integration/test_a2a_http.py tests/integration/test_mcp_streamable_http.py
+uv run pytest --no-cov -m integration \
+  tests/integration/test_a2a_http.py \
+  tests/integration/test_mcp_streamable_http.py
 ```
 
 The Collector test is opt-in and reproducible with the pinned official Contrib image in
@@ -265,8 +270,8 @@ install -m 0666 /dev/null .collector-receipts/traces.jsonl
 docker compose -f compose.collector.yml up -d
 A2A_OTEL_KIT_COLLECTOR_ENDPOINT=http://127.0.0.1:4318/v1/traces \
 A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=.collector-receipts/traces.jsonl \
-uv run pytest --no-cov tests/integration/test_collector_otlp.py
-docker compose -f compose.collector.yml down
+uv run pytest --no-cov -m integration tests/integration/test_collector_otlp.py
+docker compose -f compose.collector.yml down --volumes --remove-orphans
 ```
 
 The test records the receipt file's initial size, exports a span, and requires the appended
@@ -356,5 +361,5 @@ this repository. See `docs/DEVELOPMENT.md#releasing` for the maintainer runbook,
 GitHub environment and PyPI Trusted Publisher configuration, and rollback/yank guidance.
 
 `v0.3.0` is tagged in git but predates this project's release tooling (no `LICENSE`, no release
-workflow) and must never be published to PyPI; `v0.3.1` is the first version intended for
-publication. PyPI publication status for each version is recorded in `CHANGELOG.md`.
+workflow) and must never be published to PyPI. Publication began with `v0.3.1`; subsequent
+versions use the same immutable-tag and Trusted Publishing process.

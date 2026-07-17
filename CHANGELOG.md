@@ -5,13 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-PyPI publication status for each version is recorded in this file, not restated elsewhere.
 `v0.3.0` is tagged in git but was cut before this project's release tooling existed: its tree has
 no `LICENSE`, no PEP 639 license metadata, and not even `.github/workflows/release.yml` itself, so
 publishing it would ship a non-compliant package. **`v0.3.0` must never be published to PyPI.**
-`v0.3.1` is the first version intended for publication. `0.1.0` and `0.2.0` are reconstructed from
-the `pyproject.toml` version present at their respective commits and were never tagged or released
+PyPI publication began with `v0.3.1`. `0.1.0` and `0.2.0` are reconstructed from the
+`pyproject.toml` version present at their respective commits and were never tagged or released
 independently.
+
+## [Unreleased]
+
+## [0.4.1] - 2026-07-17
+
+### Fixed
+
+- Corrected the documented OTLP/HTTP Collector endpoint to include `/v1/traces`.
+- Made README integration commands override the default unit-only pytest marker so they execute
+  the requested A2A, MCP, and Collector tests.
+- Aligned privacy, Python compatibility, release, and publication documentation with the shipped
+  integration suite and established Trusted Publishing workflow.
 
 ## [0.4.0] - 2026-07-17
 
