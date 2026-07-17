@@ -298,11 +298,26 @@ def test_collector_job_requires_receipt_evidence_and_always_cleans_up() -> None:
     steps = document["jobs"]["collector-integration"]["steps"]
     test_step = _find_step(steps, name_contains="positive OTLP receipt")
     cleanup = _find_step(steps, name_contains="Stop the receipt Collector")
+    start = _find_step(steps, name_contains="Start the receipt Collector")
 
+    assert "install -d -m 0777 .collector-receipts" in start["run"]
+    assert "install -m 0666 /dev/null" in start["run"]
+    assert "curl --fail" in start["run"]
+    assert "logs collector" in start["run"]
     assert "test_collector_otlp.py" in test_step["run"]
+    assert "--no-cov" in test_step["run"]
     assert test_step["env"]["A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE"].endswith("traces.jsonl")
     assert cleanup["if"] == "always()"
     assert "down --volumes --remove-orphans" in cleanup["run"]
+
+
+def test_parallel_auxiliary_jobs_do_not_compete_for_uv_cache_keys() -> None:
+    """Matrix and Collector jobs avoid best-effort cache reservation warnings."""
+    document = _load(QUALITY_WORKFLOW)
+
+    for job_name in ("build-and-verify", "collector-integration", "sdk-compatibility"):
+        setup = _find_step(document["jobs"][job_name]["steps"], name_contains="Install uv")
+        assert setup["with"]["enable-cache"] is False
 
 
 def test_collector_compose_image_is_versioned_and_digest_pinned() -> None:

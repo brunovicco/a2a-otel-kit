@@ -22,11 +22,12 @@ public extras and development dependencies must describe the same interval.
 The Compose file is a local/CI receipt fixture, not a production deployment:
 
 ```bash
-mkdir -p .collector-receipts && touch .collector-receipts/traces.jsonl
+install -d -m 0777 .collector-receipts
+install -m 0666 /dev/null .collector-receipts/traces.jsonl
 docker compose -f compose.collector.yml up -d
 A2A_OTEL_KIT_COLLECTOR_ENDPOINT=http://127.0.0.1:4318/v1/traces \
 A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=.collector-receipts/traces.jsonl \
-uv run pytest -m integration tests/integration/test_collector_otlp.py
+uv run pytest --no-cov -m integration tests/integration/test_collector_otlp.py
 docker compose -f compose.collector.yml down --volumes --remove-orphans
 ```
 

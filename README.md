@@ -260,12 +260,12 @@ The Collector test is opt-in and reproducible with the pinned official Contrib i
 `compose.collector.yml`:
 
 ```bash
-mkdir -p .collector-receipts
-touch .collector-receipts/traces.jsonl
+install -d -m 0777 .collector-receipts
+install -m 0666 /dev/null .collector-receipts/traces.jsonl
 docker compose -f compose.collector.yml up -d
 A2A_OTEL_KIT_COLLECTOR_ENDPOINT=http://127.0.0.1:4318/v1/traces \
 A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=.collector-receipts/traces.jsonl \
-uv run pytest tests/integration/test_collector_otlp.py
+uv run pytest --no-cov tests/integration/test_collector_otlp.py
 docker compose -f compose.collector.yml down
 ```
 

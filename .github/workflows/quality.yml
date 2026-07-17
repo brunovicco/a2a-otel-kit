@@ -46,7 +46,7 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.28"
-          enable-cache: true
+          enable-cache: false
 
       - name: Install Python
         run: uv python install
@@ -69,7 +69,7 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.28"
-          enable-cache: true
+          enable-cache: false
           python-version: "3.13"
 
       - name: Install dependencies
@@ -77,15 +77,31 @@ jobs:
 
       - name: Start the receipt Collector
         run: |
-          mkdir -p .collector-receipts
-          touch .collector-receipts/traces.jsonl
+          install -d -m 0777 .collector-receipts
+          install -m 0666 /dev/null .collector-receipts/traces.jsonl
           docker compose -f compose.collector.yml up -d
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error \
+              --header "Content-Type: application/x-protobuf" \
+              --data-binary "" \
+              http://127.0.0.1:4318/v1/traces >/dev/null; then
+              exit 0
+            fi
+            if ! docker compose -f compose.collector.yml ps --status running --services \
+              | grep --quiet --exact collector; then
+              docker compose -f compose.collector.yml logs collector
+              exit 1
+            fi
+            sleep 1
+          done
+          docker compose -f compose.collector.yml logs collector
+          exit 1
 
       - name: Require positive OTLP receipt evidence
         env:
           A2A_OTEL_KIT_COLLECTOR_ENDPOINT: http://127.0.0.1:4318/v1/traces
           A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE: .collector-receipts/traces.jsonl
-        run: uv run pytest -m "integration" tests/integration/test_collector_otlp.py
+        run: uv run pytest --no-cov -m "integration" tests/integration/test_collector_otlp.py
 
       - name: Stop the receipt Collector
         if: always()
@@ -121,7 +137,7 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.28"
-          enable-cache: true
+          enable-cache: false
           python-version: "${{ matrix.python-version }}"
 
       - name: Install locked development environment
