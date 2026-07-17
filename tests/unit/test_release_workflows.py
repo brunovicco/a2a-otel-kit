@@ -303,6 +303,8 @@ def test_collector_job_requires_receipt_evidence_and_always_cleans_up() -> None:
     assert "install -d -m 0777 .collector-receipts" in start["run"]
     assert "install -m 0666 /dev/null" in start["run"]
     assert "curl --fail" in start["run"]
+    assert "grep --quiet --line-regexp collector" in start["run"]
+    assert "grep --quiet --exact" not in start["run"]
     assert "logs collector" in start["run"]
     assert "test_collector_otlp.py" in test_step["run"]
     assert "--no-cov" in test_step["run"]
