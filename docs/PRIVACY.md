@@ -14,6 +14,14 @@ contain by construction, for review by any project that consumes it.
 No other data category exists in this library's scope: it does not read files, call external
 APIs, or accept end-user input directly.
 
+## OTLP authentication headers
+
+Optional OTLP headers come from an application-owned callback invoked once by
+`Observability.configure()`. Credentials are excluded from `ObservabilitySettings`, logs, spans,
+events, validation details, and facade representations. Header syntax and size are validated
+before exporter construction. The upstream exporter necessarily retains resolved values in
+process memory until shutdown; rotation requires replacing the observability instance.
+
 ## Controls
 
 - **Data minimization:** `sanitize_attributes()` enforces a fixed key allowlist

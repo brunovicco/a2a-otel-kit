@@ -1,6 +1,6 @@
 # a2a-otel-kit
 
-A small, typed Python 3.13 library that standardizes OpenTelemetry initialization, W3C
+A small, typed Python 3.13/3.14 library that standardizes OpenTelemetry initialization, W3C
 trace-context propagation, structured JSON logging, and privacy-safe telemetry attributes for A2A
 agents and MCP services. It is the reusable observability foundation extracted from the
 `multi-agent-credit-desk` project so that it can be pip-installed independently and versioned
@@ -83,6 +83,21 @@ settings = ObservabilitySettings(
 )
 observability = Observability.configure(settings)
 ```
+
+For an authenticated OTLP endpoint, keep credentials outside settings and resolve them once at
+setup. The provider can read a caller-owned secret manager; its values are never rendered by this
+library:
+
+```python
+def otlp_headers() -> dict[str, str]:
+    return {"authorization": load_otlp_authorization()}  # application-owned secret lookup
+
+
+observability = Observability.configure(settings, otlp_headers_provider=otlp_headers)
+```
+
+Invalid header syntax or provider failures abort setup with a message that excludes credential
+material. Rotation requires configuring a new instance. See ADR-0005.
 
 Leaving `enabled=False` (the default) keeps the process fully untraced: `Observability.configure()`
 never requires exporter configuration in that mode.
@@ -233,27 +248,44 @@ Stdio and legacy SSE transports are not supported. See ADR-0004.
 
 ## Integration tests
 
-The default suite includes real loopback TCP tests for the official A2A JSON-RPC server routes and
-FastMCP Streamable HTTP. They use only local ephemeral ports and require no external service:
+The opt-in integration suite includes real loopback TCP tests for the official A2A JSON-RPC
+server routes and FastMCP Streamable HTTP. They use only local ephemeral ports and require no
+external service:
 
 ```bash
 uv run pytest tests/integration/test_a2a_http.py tests/integration/test_mcp_streamable_http.py
 ```
 
-The Collector test is opt-in. It requires an OTLP/HTTP Collector configured with
-`tests/integration/otel-collector-config.yaml` and a host-visible receipt file. For example, after
-starting an OpenTelemetry Collector Contrib image with port `4318` published and a host directory
-mounted at `/receipts`, run:
+The Collector test is opt-in and reproducible with the pinned official Contrib image in
+`compose.collector.yml`:
 
 ```bash
+mkdir -p .collector-receipts
+touch .collector-receipts/traces.jsonl
+docker compose -f compose.collector.yml up -d
 A2A_OTEL_KIT_COLLECTOR_ENDPOINT=http://127.0.0.1:4318/v1/traces \
-A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=/path/on/host/traces.jsonl \
+A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=.collector-receipts/traces.jsonl \
 uv run pytest tests/integration/test_collector_otlp.py
+docker compose -f compose.collector.yml down
 ```
 
 The test records the receipt file's initial size, exports a span, and requires the appended
 Collector output to contain both the expected span and service names. A reachable port or a
 successful exporter flush alone is not accepted as evidence of receipt.
+
+## Adoption examples
+
+Minimal, importable boundary-wrapping examples are available in `examples/a2a_adoption.py` and
+`examples/mcp_adoption.py`; `examples/README.md` shows setup, lifecycle, and safe header-provider
+composition. The Python modules leave SDK object construction to the consuming application and
+instrument only public HTTP boundaries.
+
+## SDK compatibility policy
+
+The supported optional ranges in `pyproject.toml` are the contract. CI tests both their minimum
+and newest bounded resolutions on Python 3.13 and 3.14, reports the installed SDK versions, and
+runs weekly as well as on pull requests and pushes to `main`. An automated policy check requires
+the public extras and development dependencies to keep identical lower and upper bounds.
 
 ## Privacy guarantees
 
@@ -289,11 +321,12 @@ Deliberately out of scope for this library:
   library - see the sibling `multi-agent-credit-desk` repository's
   `docs/adr/0006-observability-otel-fanout-datadog-langfuse.md`. No Datadog or Langfuse SDK is a
   dependency of this package.
-- **Infrastructure.** No OTel Collector config, Docker Compose stack, or deployment manifests
-  live in this repository.
-- **Custom OTLP authentication headers.** The exporter is constructed with an endpoint and
-  timeout only; per-request auth headers for a secured OTLP endpoint are not yet supported. Add
-  them at the point they become necessary, with an explicit secret-handling review at that time.
+- **Production infrastructure.** The Compose stack in this repository is a local/CI receipt test,
+  not a production Collector deployment. Backend routing, retention, scaling, and credentials
+  remain the consuming deployment's responsibility.
+- **Dynamic OTLP credential rotation.** Authentication headers are resolved once during
+  `Observability.configure()`. Rotation requires configuring a new instance and shutting down the
+  old one; per-request refresh is deliberately unsupported.
 
 ## Development
 

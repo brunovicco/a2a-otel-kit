@@ -1,0 +1,16 @@
+services:
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.153.0@sha256:93aad750175cbf1a973ae1c5886c3371f4d800f61be25cdd26870b8441ffe9fa
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    ports:
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./tests/integration/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ${A2A_OTEL_KIT_COLLECTOR_RECEIPT_DIR:-./.collector-receipts}:/receipts
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp

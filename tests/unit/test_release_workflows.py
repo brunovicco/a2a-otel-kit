@@ -229,7 +229,7 @@ def _find_step(steps: list[dict[str, Any]], *, name_contains: str) -> dict[str, 
 
 
 def test_quality_workflow_has_minimum_and_latest_bounded_sdk_matrix() -> None:
-    """Python 3.13 exercises exact minimum and newest bounded optional SDK contracts."""
+    """Both supported Pythons exercise minimum and newest bounded SDK contracts."""
     document = _load(QUALITY_WORKFLOW)
 
     job = document["jobs"]["sdk-compatibility"]
@@ -237,16 +237,40 @@ def test_quality_workflow_has_minimum_and_latest_bounded_sdk_matrix() -> None:
 
     assert matrix == [
         {
+            "python-version": "3.13",
             "sdk-set": "minimum",
             "resolution": "lowest-direct",
         },
         {
+            "python-version": "3.13",
+            "sdk-set": "latest-bounded",
+            "resolution": "highest",
+        },
+        {
+            "python-version": "3.14",
+            "sdk-set": "minimum",
+            "resolution": "lowest-direct",
+        },
+        {
+            "python-version": "3.14",
             "sdk-set": "latest-bounded",
             "resolution": "highest",
         },
     ]
     setup = _find_step(job["steps"], name_contains="Install uv")
-    assert setup["with"]["python-version"] == "3.13"
+    assert setup["with"]["python-version"] == "${{ matrix.python-version }}"
+
+
+def test_sdk_compatibility_runs_weekly_and_reports_installed_versions() -> None:
+    document = _load(QUALITY_WORKFLOW)
+
+    assert _triggers(document)["schedule"] == [{"cron": "17 6 * * 1"}]
+    steps = document["jobs"]["sdk-compatibility"]["steps"]
+    report = _find_step(steps, name_contains="Report installed")
+    bounds = _find_step(steps, name_contains="bounds stay aligned")
+
+    assert "a2a-sdk mcp" in report["run"]
+    assert "validate_sdk_compatibility.py" in bounds["run"]
 
 
 def test_sdk_compatibility_job_runs_real_loopback_contract_tests() -> None:
@@ -266,6 +290,28 @@ def test_sdk_compatibility_job_runs_real_loopback_contract_tests() -> None:
     assert "tests/integration/test_a2a_http.py" in tests["run"]
     assert "tests/integration/test_mcp_streamable_http.py" in tests["run"]
     assert "test_collector_otlp.py" not in tests["run"]
+
+
+def test_collector_job_requires_receipt_evidence_and_always_cleans_up() -> None:
+    """Collector CI runs the receipt test and removes infrastructure on every outcome."""
+    document = _load(QUALITY_WORKFLOW)
+    steps = document["jobs"]["collector-integration"]["steps"]
+    test_step = _find_step(steps, name_contains="positive OTLP receipt")
+    cleanup = _find_step(steps, name_contains="Stop the receipt Collector")
+
+    assert "test_collector_otlp.py" in test_step["run"]
+    assert test_step["env"]["A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE"].endswith("traces.jsonl")
+    assert cleanup["if"] == "always()"
+    assert "down --volumes --remove-orphans" in cleanup["run"]
+
+
+def test_collector_compose_image_is_versioned_and_digest_pinned() -> None:
+    """The development Collector cannot drift when an upstream tag moves."""
+    compose = (WORKFLOWS_DIR.parents[1] / "compose.collector.yml").read_text(encoding="utf-8")
+
+    assert "opentelemetry-collector-contrib:0.153.0@sha256:" in compose
+    digest = compose.split("@sha256:", 1)[1].splitlines()[0]
+    assert len(digest) == 64
 
 
 def test_validate_job_exposes_commit_sha_and_tag_outputs() -> None:
@@ -429,13 +475,13 @@ def test_quality_workflow_has_no_contents_write_permission_anywhere() -> None:
         assert job_permissions.get("contents") != "write"
 
 
-def test_quality_workflow_triggers_on_pull_request_and_main_push_only() -> None:
-    """Ordinary CI runs on pull requests and pushes to main, never workflow_dispatch."""
+def test_quality_workflow_triggers_on_changes_and_weekly_schedule() -> None:
+    """CI runs on changes and weekly, never through a privileged manual dispatch."""
     document = _load(QUALITY_WORKFLOW)
 
     triggers = _triggers(document)
 
-    assert set(triggers) == {"pull_request", "push"}
+    assert set(triggers) == {"pull_request", "push", "schedule"}
     assert triggers["push"]["branches"] == ["main"]
 
 

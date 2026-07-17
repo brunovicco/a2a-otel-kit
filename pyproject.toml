@@ -1,6 +1,6 @@
 [project]
 name = "a2a-otel-kit"
-version = "0.3.1"
+version = "0.4.0"
 description = "Vendor-neutral OpenTelemetry, W3C propagation, and structured-logging foundation for A2A agents and MCP services"
 readme = "README.md"
 license = "MIT"
@@ -82,6 +82,8 @@ packages = ["src/a2a_otel_kit"]
 only-include = [
     "src/a2a_otel_kit",
     "tests",
+    "examples",
+    "compose.collector.yml",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",

@@ -12,6 +12,7 @@ from a2a_otel_kit.adapters.propagation import (
     extract_trace_context,
     inject_trace_context,
 )
+from a2a_otel_kit.application.ports import OTLPHeadersProvider
 from a2a_otel_kit.application.settings import ObservabilitySettings
 from a2a_otel_kit.domain.attributes import (
     AttributeValue,
@@ -30,6 +31,7 @@ __all__ = [
     "AttributeValue",
     "InvalidObservabilityConfigurationError",
     "InvalidStructuredEventError",
+    "OTLPHeadersProvider",
     "Observability",
     "ObservabilityError",
     "ObservabilitySettings",

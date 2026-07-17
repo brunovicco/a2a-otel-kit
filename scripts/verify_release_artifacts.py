@@ -51,7 +51,16 @@ REQUIRED_MODULES = (
     "entrypoints/logging.py",
     "entrypoints/observability.py",
 )
-REQUIRED_SDIST_FILES = ("README.md", "LICENSE", "pyproject.toml")
+REQUIRED_SDIST_FILES = (
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+    "compose.collector.yml",
+    "examples/README.md",
+    "examples/a2a_adoption.py",
+    "examples/mcp_adoption.py",
+    "tests/integration/otel-collector-config.yaml",
+)
 EXPECTED_EXTRAS = ("a2a", "mcp")
 NETWORK_GUARD_SNIPPET = (
     "import socket\n"

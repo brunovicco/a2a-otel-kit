@@ -12,6 +12,27 @@ uv sync --frozen
 uv run python scripts/quality_gate.py
 ```
 
+The optional SDK contract is checked weekly and on every change across Python 3.13 and 3.14,
+using both the lowest direct and highest bounded resolutions. Run
+`uv run python scripts/validate_sdk_compatibility.py` after changing an optional SDK range;
+public extras and development dependencies must describe the same interval.
+
+## Collector integration
+
+The Compose file is a local/CI receipt fixture, not a production deployment:
+
+```bash
+mkdir -p .collector-receipts && touch .collector-receipts/traces.jsonl
+docker compose -f compose.collector.yml up -d
+A2A_OTEL_KIT_COLLECTOR_ENDPOINT=http://127.0.0.1:4318/v1/traces \
+A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=.collector-receipts/traces.jsonl \
+uv run pytest -m integration tests/integration/test_collector_otlp.py
+docker compose -f compose.collector.yml down --volumes --remove-orphans
+```
+
+The test passes only after finding its service and span names in the receipt file. Always run the
+final `down` command, including after failures.
+
 ## Building and verifying distribution artifacts
 
 ```bash

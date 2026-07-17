@@ -29,6 +29,19 @@ class TracerLifecycle(Protocol):
         ...
 
 
+class OTLPHeadersProvider(Protocol):
+    """Resolve OTLP HTTP headers once during observability setup.
+
+    Implementations may read a secret manager or another caller-owned credential source. The
+    provider and its values deliberately remain outside :class:`ObservabilitySettings` so secret
+    material is not retained in that safe-to-represent configuration object.
+    """
+
+    def __call__(self) -> Mapping[str, str]:
+        """Return the headers to give directly to the OTLP HTTP exporter."""
+        ...
+
+
 class ObservabilityFacade(Protocol):
     """The subset of Observability that a protocol adapter depends on.
 

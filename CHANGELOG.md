@@ -13,6 +13,22 @@ publishing it would ship a non-compliant package. **`v0.3.0` must never be publi
 the `pyproject.toml` version present at their respective commits and were never tagged or released
 independently.
 
+## [0.4.0] - 2026-07-17
+
+### Added
+
+- Setup-time `OTLPHeadersProvider` support for authenticated OTLP/HTTP export without adding
+  secret fields to `ObservabilitySettings`; see ADR-0005.
+- A pinned OpenTelemetry Collector Contrib Compose flow with receipt-based integration evidence.
+- Minimal A2A and MCP Streamable HTTP adoption examples with import smoke tests.
+- A scheduled Python 3.13/3.14 compatibility matrix covering minimum and latest bounded A2A/MCP
+  SDK versions, installed-version evidence, and automated dependency-bound alignment checks.
+
+### Security
+
+- OTLP header providers are evaluated only when enabled, exactly once at setup. Header syntax is
+  validated, and provider/validation failures never render credential values or exception text.
+
 ## [0.3.1] - 2026-07-16
 
 Release-readiness commit: adds packaging and release infrastructure only. Library behavior is

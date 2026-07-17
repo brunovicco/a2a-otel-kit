@@ -13,7 +13,7 @@ import structlog
 from opentelemetry.trace import Span, SpanKind, Tracer
 
 from a2a_otel_kit.adapters.tracing import build_tracer_provider
-from a2a_otel_kit.application.ports import TracerLifecycle
+from a2a_otel_kit.application.ports import OTLPHeadersProvider, TracerLifecycle
 from a2a_otel_kit.application.settings import ObservabilitySettings
 from a2a_otel_kit.domain.attributes import (
     AttributeValue,
@@ -50,8 +50,13 @@ class Observability:
         self._is_shut_down = False
 
     @classmethod
-    def configure(cls, settings: ObservabilitySettings) -> Self:
-        """Initialize structured logging and tracing for this process from validated settings."""
+    def configure(
+        cls,
+        settings: ObservabilitySettings,
+        *,
+        otlp_headers_provider: OTLPHeadersProvider | None = None,
+    ) -> Self:
+        """Initialize logging and tracing, resolving optional OTLP headers exactly once."""
         configure_logging(
             service=settings.service_name,
             environment=settings.environment,
@@ -59,7 +64,9 @@ class Observability:
             log_level=settings.log_level,
             log_format=settings.log_format,
         )
-        provider, lifecycle = build_tracer_provider(settings)
+        provider, lifecycle = build_tracer_provider(
+            settings, otlp_headers_provider=otlp_headers_provider
+        )
         tracer = provider.get_tracer(settings.service_name, settings.service_version)
         return cls(settings=settings, tracer=tracer, lifecycle=lifecycle)
 

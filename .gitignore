@@ -10,6 +10,7 @@ coverage.xml
 htmlcov/
 dist/
 build/
+.collector-receipts/
 .venv/
 
 # Secrets and local configuration

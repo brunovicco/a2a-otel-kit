@@ -1,4 +1,4 @@
-"""Regression tests for the 0.3.1 release-readiness state.
+"""Regression tests for release readiness and immutable historical tags.
 
 These guard the specific corrections made after the first packaging pass: v0.3.0 must never be
 selected for publication, the release tree must actually contain the release tooling it
@@ -24,11 +24,11 @@ def _load_pyproject() -> dict[str, Any]:
         return tomllib.load(handle)
 
 
-def test_project_version_is_0_3_1() -> None:
-    """The package version has been bumped past the unpublishable v0.3.0 tag."""
+def test_project_version_is_0_4_0() -> None:
+    """The package version matches the current operability milestone."""
     project = _load_pyproject()
 
-    assert project["project"]["version"] == "0.3.1"
+    assert project["project"]["version"] == "0.4.0"
 
 
 def test_build_system_pins_hatchling_to_an_exact_version() -> None:

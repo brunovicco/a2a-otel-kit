@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: "17 6 * * 1"
 
 permissions:
   contents: read
@@ -55,19 +57,9 @@ jobs:
       - name: Verify the built artifacts
         run: uv run --no-project python scripts/verify_release_artifacts.py --dist-dir dist
 
-  sdk-compatibility:
+  collector-integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - sdk-set: minimum
-            resolution: lowest-direct
-          - sdk-set: latest-bounded
-            resolution: highest
-
-    name: SDK compatibility (${{ matrix.sdk-set }})
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
@@ -80,14 +72,72 @@ jobs:
           enable-cache: true
           python-version: "3.13"
 
-      - name: Install locked development environment
+      - name: Install dependencies
         run: uv sync --frozen --all-groups --python 3.13
+
+      - name: Start the receipt Collector
+        run: |
+          mkdir -p .collector-receipts
+          touch .collector-receipts/traces.jsonl
+          docker compose -f compose.collector.yml up -d
+
+      - name: Require positive OTLP receipt evidence
+        env:
+          A2A_OTEL_KIT_COLLECTOR_ENDPOINT: http://127.0.0.1:4318/v1/traces
+          A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE: .collector-receipts/traces.jsonl
+        run: uv run pytest -m "integration" tests/integration/test_collector_otlp.py
+
+      - name: Stop the receipt Collector
+        if: always()
+        run: docker compose -f compose.collector.yml down --volumes --remove-orphans
+
+  sdk-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.13"
+            sdk-set: minimum
+            resolution: lowest-direct
+          - python-version: "3.13"
+            sdk-set: latest-bounded
+            resolution: highest
+          - python-version: "3.14"
+            sdk-set: minimum
+            resolution: lowest-direct
+          - python-version: "3.14"
+            sdk-set: latest-bounded
+            resolution: highest
+
+    name: SDK compatibility (Python ${{ matrix.python-version }}, ${{ matrix.sdk-set }})
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.28"
+          enable-cache: true
+          python-version: "${{ matrix.python-version }}"
+
+      - name: Install locked development environment
+        run: uv sync --frozen --all-groups --python "${{ matrix.python-version }}"
+
+      - name: Verify declared SDK bounds stay aligned
+        run: uv run python scripts/validate_sdk_compatibility.py
 
       - name: Install SDK compatibility pair
         run: >-
           uv pip install --python .venv/bin/python --group dev
           --resolution "${{ matrix.resolution }}"
           --upgrade-package a2a-sdk --upgrade-package mcp
+
+      - name: Report installed SDK versions
+        run: uv pip show --python .venv/bin/python a2a-sdk mcp
 
       - name: Run adapter and loopback integration tests
         run: >-

@@ -248,7 +248,7 @@ def test_base_package_import_does_not_require_optional_sdks() -> None:
     assert failure is None
 
 
-def test_the_real_v031_build_passes_the_complete_artifact_verifier(tmp_path: Path) -> None:
+def test_current_build_passes_the_complete_artifact_verifier(tmp_path: Path) -> None:
     """A real `uv build` of the current tree (metadata + content, not the isolated-venv smoke
     tests) passes every check: correct version, py.typed, and the a2a/mcp extras.
 
@@ -270,7 +270,7 @@ def test_the_real_v031_build_passes_the_complete_artifact_verifier(tmp_path: Pat
     expected_version = verify.read_project_version(repo_root)
     wheel_path, sdist_path = verify.find_artifacts(tmp_path)
 
-    assert expected_version == "0.3.1"
-    assert wheel_path.name == f"{DIST_NAME}-0.3.1-py3-none-any.whl"
+    assert expected_version == "0.4.0"
+    assert wheel_path.name == f"{DIST_NAME}-0.4.0-py3-none-any.whl"
     assert verify.inspect_wheel(wheel_path, expected_version) == []
     assert verify.inspect_sdist(sdist_path, expected_version) == []

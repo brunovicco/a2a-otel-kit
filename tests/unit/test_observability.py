@@ -13,6 +13,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 from a2a_otel_kit.application.settings import ObservabilitySettings
+from a2a_otel_kit.domain.errors import InvalidObservabilityConfigurationError
 from a2a_otel_kit.entrypoints.observability import Observability
 
 
@@ -73,6 +74,84 @@ def test_valid_initialization_produces_a_recording_span(
         assert span.get_span_context().is_valid
 
     obs.shutdown()
+
+
+def test_otlp_headers_provider_is_resolved_once_at_setup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class CapturingExporter(_FakeSpanExporter):
+        def __init__(self, **kwargs: object) -> None:
+            super().__init__()
+            captured.update(kwargs)
+
+    calls = 0
+
+    def provide_headers() -> dict[str, str]:
+        nonlocal calls
+        calls += 1
+        return {"authorization": "Bearer runtime-secret"}
+
+    monkeypatch.setattr("a2a_otel_kit.adapters.tracing.OTLPSpanExporter", CapturingExporter)
+    settings = _disabled_settings(enabled=True, otlp_endpoint="http://localhost:4318")
+
+    obs = Observability.configure(settings, otlp_headers_provider=provide_headers)
+
+    assert calls == 1
+    assert captured["headers"] == {"authorization": "Bearer runtime-secret"}
+    assert "runtime-secret" not in repr(settings)
+    assert "runtime-secret" not in repr(obs)
+    obs.shutdown()
+
+
+def test_disabled_observability_does_not_resolve_otlp_headers() -> None:
+    def unexpected_provider() -> dict[str, str]:
+        pytest.fail("disabled observability must not resolve credentials")
+
+    obs = Observability.configure(_disabled_settings(), otlp_headers_provider=unexpected_provider)
+
+    obs.shutdown()
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"authorization\r\ninjected": "value"},
+        {"authorization": "value\r\ninjected"},
+        {"authorization": 123},
+        {"authorization": "x" * 8193},
+        {f"x-{index}": "value" for index in range(33)},
+    ],
+)
+def test_invalid_otlp_headers_fail_without_leaking_values(
+    headers: dict[object, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("a2a_otel_kit.adapters.tracing.OTLPSpanExporter", _FakeSpanExporter)
+    settings = _disabled_settings(enabled=True, otlp_endpoint="http://localhost:4318")
+
+    with pytest.raises(InvalidObservabilityConfigurationError) as captured:
+        Observability.configure(settings, otlp_headers_provider=lambda: headers)  # type: ignore[arg-type]
+
+    rendered = str(captured.value)
+    assert "injected" not in rendered
+    assert "123" not in rendered
+
+
+def test_otlp_headers_provider_failure_is_wrapped_without_secret_leakage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("a2a_otel_kit.adapters.tracing.OTLPSpanExporter", _FakeSpanExporter)
+    settings = _disabled_settings(enabled=True, otlp_endpoint="http://localhost:4318")
+
+    def failing_provider() -> dict[str, str]:
+        raise RuntimeError("credential runtime-secret unavailable")
+
+    with pytest.raises(InvalidObservabilityConfigurationError) as captured:
+        Observability.configure(settings, otlp_headers_provider=failing_provider)
+
+    assert "runtime-secret" not in str(captured.value)
+    assert captured.value.__cause__ is None
 
 
 def test_repeated_initialization_does_not_raise() -> None:
