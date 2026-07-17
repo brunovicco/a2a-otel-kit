@@ -29,7 +29,7 @@ mcp = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "a2a-sdk" },
+    { name = "a2a-sdk", extra = ["http-server"] },
     { name = "bandit" },
     { name = "mcp" },
     { name = "mypy" },
@@ -56,7 +56,7 @@ provides-extras = ["a2a", "mcp"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "a2a-sdk", specifier = ">=1.1,<2.0" },
+    { name = "a2a-sdk", extras = ["http-server"], specifier = ">=1.1,<2.0" },
     { name = "bandit", extras = ["toml"], specifier = ">=1.8" },
     { name = "mcp", specifier = ">=1.28,<2.0" },
     { name = "mypy", specifier = ">=1.16" },
@@ -84,6 +84,12 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d4/1d/5214ce0a1932a986002b2d22f457d260376e7f91134f978f58a214b5ad88/a2a_sdk-1.1.1.tar.gz", hash = "sha256:1662462d1d0efef697917c59ffdef543248a1ffa9ea0f7c8403d087f4958e28b", size = 377552, upload-time = "2026-07-16T13:29:58.911Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cd/91/ab2ba19dea0771f7d5503f80e2f756f8f7195acd0e91d55e8ea893bf626f/a2a_sdk-1.1.1-py3-none-any.whl", hash = "sha256:60608eb77d62ae962795cf0bcb06f24be8470b4bf97adbc4ed32f170e9f40c3e", size = 244090, upload-time = "2026-07-16T13:29:57.387Z" },
+]
+
+[package.optional-dependencies]
+http-server = [
+    { name = "sse-starlette" },
+    { name = "starlette" },
 ]
 
 [[package]]

@@ -55,7 +55,7 @@ mcp = [
 
 [dependency-groups]
 dev = [
-    "a2a-sdk>=1.1,<2.0",
+    "a2a-sdk[http-server]>=1.1,<2.0",
     "mcp>=1.28,<2.0",
     "bandit[toml]>=1.8",
     "mypy>=1.16",
@@ -140,7 +140,7 @@ module = ["tests.*"]
 disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
-addopts = "--strict-config --strict-markers --cov=src/a2a_otel_kit --cov-report=term-missing"
+addopts = "--strict-config --strict-markers -m 'not integration' --cov=src/a2a_otel_kit --cov-report=term-missing"
 testpaths = ["tests"]
 markers = [
     "integration: tests that require real infrastructure",

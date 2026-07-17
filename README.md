@@ -231,6 +231,30 @@ HTTP 2xx/3xx responses complete successfully; HTTP 4xx/5xx responses produce an 
 one `failed` event without reading the response body or recording the status response content.
 Stdio and legacy SSE transports are not supported. See ADR-0004.
 
+## Integration tests
+
+The default suite includes real loopback TCP tests for the official A2A JSON-RPC server routes and
+FastMCP Streamable HTTP. They use only local ephemeral ports and require no external service:
+
+```bash
+uv run pytest tests/integration/test_a2a_http.py tests/integration/test_mcp_streamable_http.py
+```
+
+The Collector test is opt-in. It requires an OTLP/HTTP Collector configured with
+`tests/integration/otel-collector-config.yaml` and a host-visible receipt file. For example, after
+starting an OpenTelemetry Collector Contrib image with port `4318` published and a host directory
+mounted at `/receipts`, run:
+
+```bash
+A2A_OTEL_KIT_COLLECTOR_ENDPOINT=http://127.0.0.1:4318/v1/traces \
+A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=/path/on/host/traces.jsonl \
+uv run pytest tests/integration/test_collector_otlp.py
+```
+
+The test records the receipt file's initial size, exports a span, and requires the appended
+Collector output to contain both the expected span and service names. A reachable port or a
+successful exporter flush alone is not accepted as evidence of receipt.
+
 ## Privacy guarantees
 
 - Telemetry attributes are **deny-by-default**: `sanitize_attributes()` keeps only allowlisted

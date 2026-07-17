@@ -228,6 +228,46 @@ def _find_step(steps: list[dict[str, Any]], *, name_contains: str) -> dict[str, 
     return next(step for step in steps if name_contains in step.get("name", ""))
 
 
+def test_quality_workflow_has_minimum_and_latest_bounded_sdk_matrix() -> None:
+    """Python 3.13 exercises exact minimum and newest bounded optional SDK contracts."""
+    document = _load(QUALITY_WORKFLOW)
+
+    job = document["jobs"]["sdk-compatibility"]
+    matrix = job["strategy"]["matrix"]["include"]
+
+    assert matrix == [
+        {
+            "sdk-set": "minimum",
+            "resolution": "lowest-direct",
+        },
+        {
+            "sdk-set": "latest-bounded",
+            "resolution": "highest",
+        },
+    ]
+    setup = _find_step(job["steps"], name_contains="Install uv")
+    assert setup["with"]["python-version"] == "3.13"
+
+
+def test_sdk_compatibility_job_runs_real_loopback_contract_tests() -> None:
+    """Both compatibility pairs execute adapter units and the real HTTP integrations."""
+    document = _load(QUALITY_WORKFLOW)
+
+    job = document["jobs"]["sdk-compatibility"]
+    install = _find_step(job["steps"], name_contains="compatibility pair")
+    tests = _find_step(job["steps"], name_contains="loopback integration")
+
+    assert "--group dev" in install["run"]
+    assert "matrix.resolution" in install["run"]
+    assert "==" not in install["run"]
+    assert ">=" not in install["run"]
+    assert "--no-sync" in tests["run"]
+    assert '-m "integration or not integration"' in tests["run"]
+    assert "tests/integration/test_a2a_http.py" in tests["run"]
+    assert "tests/integration/test_mcp_streamable_http.py" in tests["run"]
+    assert "test_collector_otlp.py" not in tests["run"]
+
+
 def test_validate_job_exposes_commit_sha_and_tag_outputs() -> None:
     """The validate job's outputs are wired to the validation step's own outputs."""
     document = _load(RELEASE_WORKFLOW)

@@ -54,3 +54,46 @@ jobs:
 
       - name: Verify the built artifacts
         run: uv run --no-project python scripts/verify_release_artifacts.py --dist-dir dist
+
+  sdk-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sdk-set: minimum
+            resolution: lowest-direct
+          - sdk-set: latest-bounded
+            resolution: highest
+
+    name: SDK compatibility (${{ matrix.sdk-set }})
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.28"
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Install locked development environment
+        run: uv sync --frozen --all-groups --python 3.13
+
+      - name: Install SDK compatibility pair
+        run: >-
+          uv pip install --python .venv/bin/python --group dev
+          --resolution "${{ matrix.resolution }}"
+          --upgrade-package a2a-sdk --upgrade-package mcp
+
+      - name: Run adapter and loopback integration tests
+        run: >-
+          uv run --no-sync pytest -m "integration or not integration"
+          tests/unit/test_a2a_adapter.py
+          tests/unit/test_a2a_adapter_streaming.py
+          tests/unit/test_mcp_adapter.py
+          tests/integration/test_a2a_http.py
+          tests/integration/test_mcp_streamable_http.py
