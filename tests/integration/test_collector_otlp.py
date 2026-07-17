@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -41,9 +42,18 @@ def test_collector_receives_exported_span() -> None:
     finally:
         observability.shutdown(5)
 
-    with receipt.open("rb") as handle:
-        handle.seek(initial_size)
-        appended = handle.read().decode("utf-8", errors="replace")
+    deadline = time.monotonic() + 5
+    appended = ""
+    while time.monotonic() < deadline:
+        with receipt.open("rb") as handle:
+            handle.seek(initial_size)
+            appended = handle.read().decode("utf-8", errors="replace")
+        if (
+            "collector.integration.receipt" in appended
+            and "a2a-otel-kit-collector-integration" in appended
+        ):
+            break
+        time.sleep(0.05)
 
     assert "collector.integration.receipt" in appended
     assert "a2a-otel-kit-collector-integration" in appended

@@ -331,6 +331,15 @@ def test_collector_compose_image_is_versioned_and_digest_pinned() -> None:
     assert len(digest) == 64
 
 
+def test_collector_receipt_exporter_has_a_short_bounded_flush_interval() -> None:
+    """Receipt evidence is flushed promptly instead of racing the integration assertion."""
+    config = (WORKFLOWS_DIR.parents[1] / "tests/integration/otel-collector-config.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "flush_interval: 100ms" in config
+
+
 def test_validate_job_exposes_commit_sha_and_tag_outputs() -> None:
     """The validate job's outputs are wired to the validation step's own outputs."""
     document = _load(RELEASE_WORKFLOW)

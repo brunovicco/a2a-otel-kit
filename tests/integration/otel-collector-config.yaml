@@ -7,6 +7,7 @@ receivers:
 exporters:
   file/receipt:
     path: /receipts/traces.jsonl
+    flush_interval: 100ms
 
 service:
   pipelines:
