@@ -1,386 +1,325 @@
 # a2a-otel-kit
 
-A small, typed Python 3.13/3.14 library that standardizes OpenTelemetry initialization, W3C
-trace-context propagation, structured JSON logging, and privacy-safe telemetry attributes for A2A
-agents and MCP services. It is the reusable observability foundation extracted from the
-`multi-agent-credit-desk` project so that it can be pip-installed independently and versioned
-across multiple services.
+[Português (Brasil)](README.pt-BR.md)
 
-## Scope
+> **Vendor-neutral distributed tracing for A2A agents and MCP services.**
 
-This library provides:
+Connect agent-to-agent and MCP calls into a single OpenTelemetry trace using W3C Trace Context - without capturing prompts, messages, credentials, or business payloads.
 
-- Immutable, validated observability settings (`ObservabilitySettings`).
-- Explicit tracing + structured-logging initialization and idempotent shutdown/flush
-  (`Observability`).
-- W3C `traceparent`/`tracestate` injection into, and extraction from, plain
-  `Mapping`/`MutableMapping[str, str]` carriers - the same shape as HTTP headers, gRPC metadata,
-  or message-queue headers.
-- Deterministic, allowlist-based sanitization of telemetry attributes (`sanitize_attributes`).
-- A versioned structured-event schema (`StructuredEvent`, `schema_version`, `event_name`,
-  `event_outcome`).
-- An optional, concrete OpenTelemetry integration for the official A2A Python SDK
-  (`adapters/a2a.py`, requires the `a2a` extra) - see [A2A integration](#a2a-integration).
-- Optional Streamable HTTP instrumentation for the official MCP Python SDK
-  (`adapters/mcp.py`, requires the `mcp` extra) - see [MCP integration](#mcp-integration).
+[![PyPI](https://img.shields.io/pypi/v/a2a-otel-kit)](https://pypi.org/project/a2a-otel-kit/)
+[![Python](https://img.shields.io/pypi/pyversions/a2a-otel-kit)](https://pypi.org/project/a2a-otel-kit/)
+[![Quality](https://github.com/brunovicco/a2a-otel-kit/actions/workflows/quality.yml/badge.svg)](https://github.com/brunovicco/a2a-otel-kit/actions/workflows/quality.yml)
+[![License](https://img.shields.io/github/license/brunovicco/a2a-otel-kit)](LICENSE)
 
-This library exports traces exclusively through standard OTLP over HTTP and writes structured
-logs to the configured process stream. It does not deploy, configure, or require an OTel
-Collector, Datadog, or Langfuse at runtime - those are operated by whatever process consumes this
-library (see [Limitations](#limitations-and-deferred-work)). No observability-vendor SDK is
-imported here.
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="a2a-otel-kit architecture" width="920">
+</p>
 
-## Architecture
+## Why this exists
 
-```text
-src/a2a_otel_kit/
-├── domain/         # sanitize_attributes(), StructuredEvent - pure Python, no OTel/pydantic import
-├── application/     # ObservabilitySettings, TracerLifecycle/ObservabilityFacade ports
-├── adapters/        # OpenTelemetry SDK wiring (tracing.py), W3C propagation (propagation.py),
-│                    # optional A2A SDK integration (a2a.py, requires the `a2a` extra)
-└── entrypoints/      # configure_logging(), the Observability composition root/facade
-```
+Agentic systems rarely execute inside one process.
 
-Dependency direction: `entrypoints -> application -> domain`, `adapters -> application/domain`.
-See `docs/ARCHITECTURE.md` for the full rule set this repository enforces.
+A single request can cross an orchestrator, one or more A2A agents, MCP servers, HTTP boundaries, and downstream services. Without explicit trace-context propagation, each hop becomes an isolated telemetry island and debugging turns into correlation by timestamps and guesswork.
 
-## Installation
+`a2a-otel-kit` provides a focused observability boundary for those distributed interactions:
+
+- OpenTelemetry tracing exported through OTLP/HTTP.
+- W3C `traceparent` and `tracestate` propagation.
+- A2A client and server instrumentation.
+- MCP Streamable HTTP client and server instrumentation.
+- Structured JSON events correlated with active traces.
+- Privacy-safe, deny-by-default telemetry attributes.
+- Explicit lifecycle with flush and shutdown.
+- No Datadog, Langfuse, or other vendor SDK dependency.
+
+**One business request. Multiple agents. Multiple protocols. One distributed trace.**
+
+## What you get
+
+| Capability | Support |
+| --- | --- |
+| OpenTelemetry spans | ✅ |
+| OTLP/HTTP export | ✅ |
+| W3C Trace Context | ✅ |
+| Structured JSON events | ✅ |
+| A2A client tracing | ✅ |
+| A2A server tracing | ✅ JSON-RPC / REST |
+| A2A streaming lifecycle | ✅ |
+| MCP client tracing | ✅ Streamable HTTP |
+| MCP server tracing | ✅ Streamable HTTP |
+| Privacy-safe attribute sanitization | ✅ |
+| Governance runtime telemetry adapter | ✅ Optional |
+| A2A gRPC context continuity | ⚠️ Not verified |
+| MCP stdio | ❌ |
+| Legacy MCP SSE | ❌ |
+
+## Privacy by design
+
+Telemetry is **metadata-only by construction**, not merely "content capture disabled by default."
+
+| Data | Captured |
+| --- | :---: |
+| Trace ID / Span ID | ✅ |
+| Fixed operation names | ✅ |
+| Service metadata | ✅ |
+| Allowlisted scalar attributes | ✅ |
+| Prompts | ❌ |
+| Model responses | ❌ |
+| A2A message bodies | ❌ |
+| Task / artifact content | ❌ |
+| MCP arguments and results | ❌ |
+| Authorization headers | ❌ |
+| Credentials / secrets | ❌ |
+| Exception messages | ❌ |
+
+The sanitizer keeps only allowlisted keys, rejects credential-like keys even if explicitly added to an allowlist, and drops unsupported or oversized values. See [Privacy model](docs/PRIVACY.md).
+
+## 60-second quickstart
+
+Install the base package:
 
 ```bash
 uv add a2a-otel-kit
 ```
 
-## Configuration
+Or install protocol adapters:
 
-`ObservabilitySettings` is a frozen `pydantic-settings` model. Construct it explicitly, or load it
-from `A2A_OTEL_`-prefixed environment variables (a library-specific prefix - this does not
-implement the official OTel SDK auto-instrumentation environment contract):
+```bash
+uv add "a2a-otel-kit[a2a,mcp]"
+```
 
-| Field | Env var | Default | Notes |
-|---|---|---|---|
-| `service_name` | `A2A_OTEL_SERVICE_NAME` | required | Non-empty |
-| `service_version` | `A2A_OTEL_SERVICE_VERSION` | required | Non-empty |
-| `environment` | `A2A_OTEL_ENVIRONMENT` | required | Non-empty |
-| `enabled` | `A2A_OTEL_ENABLED` | `False` | No-op tracing when `False` |
-| `otlp_endpoint` | `A2A_OTEL_OTLP_ENDPOINT` | `None` | Required (`http://`/`https://`) when `enabled=True` |
-| `otlp_timeout_seconds` | `A2A_OTEL_OTLP_TIMEOUT_SECONDS` | `10.0` | Must be positive |
-| `log_level` | `A2A_OTEL_LOG_LEVEL` | `"INFO"` | Standard `logging` level name |
-| `log_format` | `A2A_OTEL_LOG_FORMAT` | `"json"` | `"json"` or `"console"` |
-
-Validation runs at construction time, before any tracer provider or exporter is built. Enabling
-tracing without an endpoint raises `InvalidObservabilityConfigurationError` immediately.
-`ObservabilitySettings` carries no credential or secret field, so its default `repr()` is always
-safe to log.
+Configure observability:
 
 ```python
 from a2a_otel_kit import Observability, ObservabilitySettings
 
 settings = ObservabilitySettings(
-    service_name="cadastral-agent",
-    service_version="0.1.0",
+    service_name="orchestrator",
+    service_version="1.0.0",
     environment="local",
     enabled=True,
-    otlp_endpoint="http://localhost:4318/v1/traces",  # local Collector OTLP/HTTP traces endpoint
+    otlp_endpoint="http://localhost:4318/v1/traces",
 )
+
 observability = Observability.configure(settings)
 ```
 
-For an authenticated OTLP endpoint, keep credentials outside settings and resolve them once at
-setup. The provider can read a caller-owned secret manager; its values are never rendered by this
-library:
+Create application spans and structured events:
 
 ```python
-def otlp_headers() -> dict[str, str]:
-    return {"authorization": load_otlp_authorization()}  # application-owned secret lookup
-
-
-observability = Observability.configure(settings, otlp_headers_provider=otlp_headers)
+with observability.start_span(
+    "customer.lookup",
+    attributes={"operation": "customer_lookup"},
+):
+    observability.emit_event(
+        "customer.lookup.completed",
+        "success",
+        operation="customer_lookup",
+    )
 ```
 
-Invalid header syntax or provider failures abort setup with a message that excludes credential
-material. Rotation requires configuring a new instance. See ADR-0005.
-
-Leaving `enabled=False` (the default) keeps the process fully untraced: `Observability.configure()`
-never requires exporter configuration in that mode.
-
-## Lifecycle
+Always release exporter resources during shutdown:
 
 ```python
-observability = Observability.configure(settings)
 try:
     ...
 finally:
-    observability.flush()      # block until pending spans are exported
-    observability.shutdown()   # release exporter resources; safe to call more than once
+    observability.flush()
+    observability.shutdown()
 ```
 
-Each `Observability.configure()` call builds an independent instance with no shared global
-OpenTelemetry state (no `set_tracer_provider`/`set_global_textmap` call). Repeated initialization
-never raises and never corrupts a previously configured instance; when replacing an active
-instance, shut the old one down first to release its resources. See `docs/adr/0002-*.md` for the
-reasoning behind this choice.
+When `enabled=False`, tracing is a no-op and callers do not need branching logic.
 
-## Tracing and structured events
+## End-to-end trace
 
-```python
-with observability.start_span("cadastral.lookup", attributes={"operation": "kyc_check"}) as span:
-    observability.emit_event("cadastral.lookup.completed", "success", operation="kyc_check")
+A traced interaction can look conceptually like this:
+
+```text
+orchestrator
+└── a2a.client.send_message
+    └── risk-agent
+        └── a2a.server.on_message_send
+            └── mcp.client.request
+                └── customer-data-mcp
+                    └── mcp.server.request
 ```
 
-`start_span` produces a no-op, non-recording span when observability is disabled - callers never
-need to branch on whether tracing is enabled. `emit_event` writes one structured JSON log line
-carrying `schema_version`, `event_name`, and `event_outcome`, and automatically attaches
-`trace_id`/`span_id` when called inside an active span. Attributes passed to either call go
-through the same allowlist-and-redact sanitizer (see [Privacy guarantees](#privacy-guarantees)).
+The operation span is created before W3C context is injected, so downstream work continues the same distributed trace.
 
-## Propagation
-
-```python
-from a2a_otel_kit import continue_trace, extract_trace_context, inject_trace_context
-
-# Sending side (e.g. a future A2A task hand-off or MCP call):
-carrier: dict[str, str] = {}
-inject_trace_context(carrier)
-# ... send `carrier` alongside the request, e.g. as HTTP headers ...
-
-# Receiving side:
-with continue_trace(carrier):
-    with observability.start_span("financeiro.cashflow_analysis"):
-        ...  # this span is a child of the sender's span
-```
-
-`inject_trace_context`/`extract_trace_context`/`continue_trace` operate on plain
-`Mapping`/`MutableMapping[str, str]` carriers and never mutate OpenTelemetry's global propagator
-registry, so a future HTTP, gRPC, or queue-header adapter can reuse them directly.
+<p align="center">
+  <img src="docs/assets/trace-flow.png" alt="Distributed A2A and MCP trace flow" width="920">
+</p>
 
 ## A2A integration
 
-Optional: requires the `a2a` extra.
+Install:
 
 ```bash
 uv add "a2a-otel-kit[a2a]"
 ```
 
-The supported `a2a-sdk` range is `>=1.1,<2.0`; CI exercises its minimum and newest bounded
-resolutions. Supported extension points:
-
-- **Client (outbound):** `a2a.client.client.Client` - `TracingClient` wraps a concrete client
-  instance and delegates every method, injecting the current W3C trace context into
-  `ClientCallContext.service_parameters` (the field the SDK's own `get_http_args()` copies into
-  outbound HTTP headers for the JSON-RPC and REST transports).
-- **Server (inbound, JSON-RPC/REST only):** `a2a.server.request_handlers.request_handler.RequestHandler` -
-  `TracingRequestHandler` wraps a concrete handler and extracts a W3C trace context from
-  `ServerCallContext.state['headers']` (populated with the real inbound HTTP headers by the SDK's
-  `DefaultServerCallContextBuilder`).
+Outbound calls wrap the official A2A client:
 
 ```python
-# Outbound (a service calling another agent):
 from a2a_otel_kit.adapters.a2a import TracingClient
 
-client = TracingClient.wrap(real_client, observability)  # real_client: a2a.client.client.Client
+client = TracingClient.wrap(real_client, observability)
+
 async for event in client.send_message(request):
-    ...  # traceparent/tracestate are already injected into the outbound call
-
-# Inbound (an agent's own A2A server):
-from a2a_otel_kit.adapters.a2a import TracingRequestHandler
-
-request_handler = TracingRequestHandler.wrap(real_handler, observability)  # wraps e.g. DefaultRequestHandler
-# pass request_handler to the FastAPI app builder as usual; the caller's trace context is
-# extracted automatically before each method runs.
+    ...
 ```
 
-`TracingClient.wrap()`/`TracingRequestHandler.wrap()` are idempotent: wrapping an already-wrapped
-instance returns it unchanged, so calling `wrap()` more than once never produces duplicate spans.
+Inbound JSON-RPC / REST requests wrap the official request handler:
 
-**Captured:** a fixed, low-cardinality span name per operation (e.g. `"a2a.client.send_message"`,
-built from the SDK's own method name, never from remote-supplied data), one `operation` attribute
-(the same fixed name), and a `started`/`completed`/`failed` structured event per operation, all
-three sharing the operation's own `trace_id`/`span_id`. Outbound (`TracingClient`) spans use
-`SpanKind.CLIENT`; inbound (`TracingRequestHandler`) spans use `SpanKind.SERVER`. A failed
-operation's span gets an ERROR status with no description; the original exception or cancellation
-always propagates to the caller unchanged.
+```python
+from a2a_otel_kit.adapters.a2a import TracingRequestHandler
 
-**Streaming cleanup and terminal outcomes:** `send_message`, `subscribe`, `on_message_send_stream`,
-and `on_subscribe_to_task` each own exactly one inner iterator and close it deterministically -
-via exhaustion, an exception, an explicit `aclose()`, or task cancellation alike - never relying
-on garbage collection. Exactly one terminal event is ever emitted per operation: full stream
-exhaustion is `completed`/SUCCESS; anything else (an exception, an early `aclose()`, or
-cancellation) is `failed`/ERROR. See `docs/adr/0003-a2a-request-response-wrapping.md` for the full
-rationale, including why the SDK's own SSE reader independently arrived at the same
-explicit-ownership approach for its underlying HTTP connection.
+request_handler = TracingRequestHandler.wrap(
+    real_handler,
+    observability,
+)
+```
 
-**Explicitly excluded:** message bodies, task/artifact content, agent names, URLs, header values,
-and exception messages are never recorded in a span or event - a failure is signaled by status and
-event outcome alone.
+The adapter records fixed low-cardinality operation metadata only. It does not record agent names, message bodies, artifact content, arbitrary headers, URLs, or exception text.
 
-**Not covered:** the gRPC transport builds its `ServerCallContext` from gRPC servicer context, not
-Starlette headers, so inbound trace-context extraction is unverified for gRPC-originated requests
-(wrapping a gRPC-backed handler still produces spans/events; only continuity across that specific
-transport boundary is unverified). See `docs/adr/0003-a2a-request-response-wrapping.md` for why
-the SDK's own `ClientCallInterceptor` hook was not used for span lifetime.
+Streaming operations own their inner iterators explicitly and emit exactly one terminal outcome for exhaustion, exception, cancellation, or early close.
+
+See the complete [A2A integration guide](docs/A2A.md).
 
 ## MCP integration
 
-Optional: `uv add "a2a-otel-kit[mcp]"`. The supported `mcp` range is `>=1.28,<2.0`; CI exercises
-its minimum and newest bounded resolutions. Integration is limited to public Streamable HTTP
-boundaries. Wrap an HTTPX transport and pass its client to
-`streamable_http_client(http_client=client)`; wrap the ASGI app returned by
-`FastMCP.streamable_http_app()` on the server:
+Install:
+
+```bash
+uv add "a2a-otel-kit[mcp]"
+```
+
+Instrument public Streamable HTTP boundaries:
 
 ```python
 import httpx
 from mcp.client.streamable_http import streamable_http_client
 
-from a2a_otel_kit.adapters.mcp import TracingASGIMiddleware, TracingAsyncTransport
+from a2a_otel_kit.adapters.mcp import (
+    TracingASGIMiddleware,
+    TracingAsyncTransport,
+)
 
-transport = TracingAsyncTransport.wrap(httpx.AsyncHTTPTransport(), observability)
-mcp_asgi_app = TracingASGIMiddleware.wrap(fastmcp.streamable_http_app(), observability)
+transport = TracingAsyncTransport.wrap(
+    httpx.AsyncHTTPTransport(),
+    observability,
+)
+
+mcp_asgi_app = TracingASGIMiddleware.wrap(
+    fastmcp.streamable_http_app(),
+    observability,
+)
 
 async with httpx.AsyncClient(transport=transport) as http_client:
-    async with streamable_http_client(url, http_client=http_client) as streams:
-        ...  # use the MCP session while both contexts own their resources
+    async with streamable_http_client(
+        url,
+        http_client=http_client,
+    ) as streams:
+        ...
 ```
 
-Outbound spans use `SpanKind.CLIENT`; inbound spans use `SpanKind.SERVER`. Only fixed operation
-names and the fixed `operation` attribute are recorded. The adapter propagates only `traceparent`
-and `tracestate`; it never reads MCP arguments, results, request/response bodies, arbitrary header
-values, URLs, or exception text. Setup is explicit and both `wrap()` methods are idempotent.
-HTTP 2xx/3xx responses complete successfully; HTTP 4xx/5xx responses produce an ERROR span and
-one `failed` event without reading the response body or recording the status response content.
-Stdio and legacy SSE transports are not supported. See ADR-0004.
+Only `traceparent` and `tracestate` are propagated. MCP arguments, results, bodies, arbitrary headers, URLs, and exception text are not captured.
 
-## Governance runtime telemetry sink
+See [MCP integration](docs/MCP.md).
 
-Optional, explicit integration with `verifiable-ai-governance` is available through
-`a2a_otel_kit.adapters.governance`. It converts an existing `StructuredEvent` into the closed
-P1.7a runtime-telemetry contract and delivers it without adding Governance behavior to the generic
-`Observability` facade.
+## Vendor-neutral by design
 
-```python
-import os
+`a2a-otel-kit` stops at the OpenTelemetry boundary:
 
-from a2a_otel_kit.adapters.governance import (
-    GovernanceRuntimeTelemetrySettings,
-    GovernanceRuntimeTelemetrySink,
-)
-from a2a_otel_kit.domain.attributes import StructuredEvent, StructuredEventOutcome
-
-settings = GovernanceRuntimeTelemetrySettings(
-    base_url="https://governance.example.com",
-    agent_id="11111111-1111-4111-8111-111111111111",
-    service="decision-agent",
-    environment="production",
-    version="1.0.0",
-)
-sink = GovernanceRuntimeTelemetrySink(
-    settings,
-    credential_provider=lambda: os.environ["GOVERNANCE_RUNTIME_TELEMETRY_API_KEY"],
-)
-
-await sink.emit(
-    StructuredEvent(
-        event_name="decision.completed",
-        event_outcome=StructuredEventOutcome.SUCCESS,
-        attributes={"operation": "decision"},
-    )
-)
+```text
+Agent / MCP service
+        │
+        ▼
+   a2a-otel-kit
+        │
+     OTLP/HTTP
+        │
+        ▼
+OpenTelemetry Collector
+   ├── Tempo
+   ├── Datadog
+   ├── Jaeger-compatible backend
+   └── deployment-owned destinations
 ```
 
-The adapter re-sanitizes attributes, ignores unknown/content-bearing keys, captures only valid
-active `trace_id`/`span_id`, and sends the exact closed contract accepted by Governance. Internal
-retries reuse the same `event_id` and serialized body so Governance idempotency remains effective.
+Collector deployment, vendor routing, credentials, retention, and backend configuration belong to the consuming platform.
 
-The credential is caller-owned and is not retained in the safe-to-represent settings object.
-Remote endpoints require HTTPS; cleartext HTTP is allowed only for loopback development.
+No observability-vendor SDK is imported by this package.
 
-Delivery is deliberately explicit rather than wired into `Observability.emit_event()`: emitting a
-local log event must not unexpectedly perform remote I/O. Applications also retain control over
-whether Governance telemetry delivery failures affect the business path. See ADR-0006.
+## Governance runtime telemetry
 
-## Integration tests
-The opt-in integration suite includes real loopback TCP tests for the official A2A JSON-RPC
-server routes and FastMCP Streamable HTTP. They use only local ephemeral ports and require no
-external service:
+An optional adapter can convert an existing `StructuredEvent` into the closed runtime-telemetry contract used by `verifiable-ai-governance`.
 
-```bash
-uv run pytest --no-cov -m integration \
-  tests/integration/test_a2a_http.py \
-  tests/integration/test_mcp_streamable_http.py
+```text
+                         ┌──▶ OpenTelemetry / OTLP
+Agent ─▶ a2a-otel-kit ───┤
+                         └──▶ Governance runtime evidence
 ```
 
-The Collector test is opt-in and reproducible with the pinned official Contrib image in
-`compose.collector.yml`:
+Delivery is intentionally explicit. Calling `Observability.emit_event()` never performs unexpected governance network I/O.
 
-```bash
-install -d -m 0777 .collector-receipts
-install -m 0666 /dev/null .collector-receipts/traces.jsonl
-docker compose -f compose.collector.yml up -d
-A2A_OTEL_KIT_COLLECTOR_ENDPOINT=http://127.0.0.1:4318/v1/traces \
-A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=.collector-receipts/traces.jsonl \
-uv run pytest --no-cov -m integration tests/integration/test_collector_otlp.py
-docker compose -f compose.collector.yml down --volumes --remove-orphans
+The governance adapter re-sanitizes attributes, keeps credentials outside safe-to-represent settings, reuses event identifiers across retries, and requires HTTPS for non-loopback endpoints.
+
+See [Governance integration](docs/GOVERNANCE.md).
+
+## Architecture
+
+The package follows an enforced dependency direction:
+
+```text
+src/a2a_otel_kit/
+├── domain/       # telemetry vocabulary, sanitization, errors
+├── application/  # settings and consumer-facing ports
+├── adapters/     # OTel, W3C, A2A, MCP, governance
+└── entrypoints/  # explicit composition facade and logging
 ```
 
-The test records the receipt file's initial size, exports a span, and requires the appended
-Collector output to contain both the expected span and service names. A reachable port or a
-successful exporter flush alone is not accepted as evidence of receipt.
+```text
+entrypoints ──▶ application ──▶ domain
+adapters    ──▶ application / domain
+domain      ──▶ no outer layer
+```
 
-## Adoption examples
+Important design properties:
 
-Minimal, importable boundary-wrapping examples are available in `examples/a2a_adoption.py` and
-`examples/mcp_adoption.py`; `examples/README.md` shows setup, lifecycle, and safe header-provider
-composition. The Python modules leave SDK object construction to the consuming application and
-instrument only public HTTP boundaries.
+- Importing the package performs no I/O.
+- No global OpenTelemetry tracer provider is installed.
+- Each configured `Observability` instance owns its lifecycle.
+- Optional A2A and MCP SDKs remain outside inner layers.
+- Protocol adapters instrument public boundaries.
+- Privacy rules live below transport-specific adapters.
+- Architecture rules are validated by repository tooling.
 
-## SDK compatibility policy
+Read [Architecture](docs/ARCHITECTURE.md) and the [ADRs](docs/adr/).
 
-The supported optional ranges in `pyproject.toml` are the contract. CI tests both their minimum
-and newest bounded resolutions on Python 3.13 and 3.14, reports the installed SDK versions, and
-runs weekly as well as on pull requests and pushes to `main`. An automated policy check requires
-the public extras and development dependencies to keep identical lower and upper bounds.
+## What this is - and what it is not
 
-## Privacy guarantees
+| `a2a-otel-kit` is | `a2a-otel-kit` is not |
+| --- | --- |
+| Distributed tracing foundation | An observability backend |
+| A2A / MCP instrumentation | An agent framework |
+| W3C context propagation | A Collector deployment |
+| Structured telemetry | A prompt logger |
+| Vendor-neutral OTLP | A Datadog SDK wrapper |
+| Privacy-safe metadata | An LLM conversation recorder |
+| Explicit runtime integration | Automatic monkey-patching |
 
-- Telemetry attributes are **deny-by-default**: `sanitize_attributes()` keeps only allowlisted
-  keys (see `DEFAULT_ALLOWED_ATTRIBUTE_KEYS` in `domain/attributes.py`), rejects any key that
-  looks like a credential or secret (password, token, authorization, cookie, api-key, credential,
-  private-key, ssn, access-key patterns) even if the caller adds it to the allowlist, and drops
-  non-scalar or oversized string values.
-- There is no prompt/completion/content-capture concept anywhere in this library's public API.
-  Metadata is all it ever sends - full stop, not "off by default."
-- `ObservabilitySettings` has no secret-bearing field, so its representation is always safe to
-  print or log; a future field named like a credential would need its own redaction and is
-  guarded by a repository test (`tests/unit/test_settings.py`).
-- Structured logs never carry request/response payloads, only the fields a caller explicitly
-  passes through `emit_event`/`start_span`, filtered by the same allowlist.
+## Verification
 
-The **boundary** this library draws: telemetry (traces, structured logs) is metadata-only by
-construction here. Anything resembling artifact/content capture (prompts, documents, customer
-data) belongs in an application-owned artifact store, never in telemetry - this library provides
-no path to do otherwise.
+The repository verifies more than importability:
 
-## Limitations and deferred work
+- Unit tests cover sanitization, lifecycle, correlation, concurrency, cancellation, streaming, and privacy.
+- Loopback integration tests exercise the official A2A HTTP routes and FastMCP Streamable HTTP over real TCP sockets.
+- An opt-in Collector integration exports a span and verifies positive receipt from Collector output.
+- CI exercises the minimum and newest bounded A2A/MCP SDK versions on Python 3.13 and 3.14.
+- Release artifacts are inspected and smoke-tested before publication.
 
-Deliberately out of scope for this library:
-
-- **Other MCP transports.** The optional MCP adapter supports Streamable HTTP only. Stdio and
-  legacy SSE do not expose the same HTTP propagation boundary and remain out of scope.
-- **gRPC trace-context continuity for A2A.** `TracingRequestHandler` extracts inbound trace
-  context from Starlette request headers, which the gRPC transport does not populate the same
-  way; gRPC-originated requests still get spans/events, just not verified context continuity.
-- **Vendor backends (Datadog, Langfuse).** This library emits OTLP and stops there. Fan-out to
-  vendor backends is the responsibility of a central OTel Collector operated outside this
-  library - see the sibling `multi-agent-credit-desk` repository's
-  `docs/adr/0006-observability-otel-fanout-datadog-langfuse.md`. No Datadog or Langfuse SDK is a
-  dependency of this package.
-- **Production infrastructure.** The Compose stack in this repository is a local/CI receipt test,
-  not a production Collector deployment. Backend routing, retention, scaling, and credentials
-  remain the consuming deployment's responsibility.
-- **Dynamic OTLP credential rotation.** Authentication headers are resolved once during
-  `Observability.configure()`. Rotation requires configuring a new instance and shutting down the
-  old one; per-request refresh is deliberately unsupported.
-
-## Development
+Run the default quality gate:
 
 ```bash
 uv sync --frozen
@@ -388,21 +327,85 @@ uv run pytest
 uv run python scripts/quality_gate.py
 ```
 
-See `AGENTS.md` for the full engineering contract and `docs/ARCHITECTURE.md` for the enforced
-dependency rules.
+Run protocol integration tests:
 
-## Packaging and releases
+```bash
+uv run pytest --no-cov -m integration \
+  tests/integration/test_a2a_http.py \
+  tests/integration/test_mcp_streamable_http.py
+```
 
-Build and verify the distributable wheel and sdist locally:
+Run the OpenTelemetry Collector receipt test:
+
+```bash
+install -d -m 0777 .collector-receipts
+install -m 0666 /dev/null .collector-receipts/traces.jsonl
+
+docker compose -f compose.collector.yml up -d
+
+A2A_OTEL_KIT_COLLECTOR_ENDPOINT=http://127.0.0.1:4318/v1/traces \
+A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=.collector-receipts/traces.jsonl \
+uv run pytest --no-cov -m integration \
+  tests/integration/test_collector_otlp.py
+
+docker compose -f compose.collector.yml down --volumes --remove-orphans
+```
+
+The Collector test verifies positive receipt by requiring the exported span and service name to appear in Collector output. Endpoint reachability or a successful exporter flush alone is not treated as proof of delivery.
+
+## Documentation
+
+Start with the [documentation index](docs/README.md).
+
+| Topic | Document |
+| --- | --- |
+| Architecture and boundaries | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| A2A integration | [A2A.md](docs/A2A.md) |
+| MCP integration | [MCP.md](docs/MCP.md) |
+| Privacy model | [PRIVACY.md](docs/PRIVACY.md) |
+| LLM observability boundary | [LLM_OBSERVABILITY.md](docs/LLM_OBSERVABILITY.md) |
+| Governance integration | [GOVERNANCE.md](docs/GOVERNANCE.md) |
+| Troubleshooting | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
+| Development and releases | [DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+| Architectural decisions | [docs/adr/](docs/adr/) |
+
+Importable adoption examples are available under [`examples/`](examples/).
+
+## Compatibility
+
+- Python: `>=3.13,<3.15`
+- `a2a-sdk`: `>=1.1,<2.0`
+- `mcp`: `>=1.28,<2.0`
+- OpenTelemetry SDK/exporter: `>=1.43,<2.0`
+
+The declared optional dependency ranges are the compatibility contract. CI checks both minimum and newest bounded resolutions.
+
+## Limitations
+
+Deliberately out of scope:
+
+- A2A gRPC trace-context continuity is not verified.
+- MCP stdio is not instrumented.
+- Legacy MCP SSE is not instrumented.
+- Collector deployment and retention are not owned by the library.
+- Vendor-specific backend configuration is not owned by the library.
+- OTLP authentication headers are resolved during configuration; dynamic per-request credential rotation is not provided.
+
+These are boundaries, not hidden unsupported paths.
+
+## Releases
+
+The package is published to PyPI using GitHub Actions and PyPI Trusted Publishing.
+
+Build and verify locally:
 
 ```bash
 uv build --out-dir dist
 uv run python scripts/verify_release_artifacts.py --dist-dir dist
 ```
 
-This inspects both artifacts' contents and metadata (including the `a2a`/`mcp` extras) and
-installs the wheel into isolated temporary virtual environments to smoke-test imports with
-network I/O blocked. Releases are published to PyPI through a GitHub Actions workflow using
-[PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/) - no PyPI token is stored in
-this repository. See `docs/DEVELOPMENT.md#releasing` for the maintainer runbook, the required
-GitHub environment and PyPI Trusted Publisher configuration, and rollback/yank guidance.
+See [CHANGELOG.md](CHANGELOG.md) and the release runbook in [DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
