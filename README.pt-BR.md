@@ -55,7 +55,8 @@ O `a2a-otel-kit` fornece uma camada focada de observabilidade para essas intera�
 
 ## Privacidade por design
 
-A telemetria é **somente metadados por construção**, e não apenas porque a captura de conteúdo está desabilitada por padrão.
+A telemetria dos adapters A2A/MCP embutidos é **somente metadados por construção**, e não apenas
+porque a captura de conteúdo está desabilitada por padrão.
 
 | Dado | Capturado |
 | --- | :---: |
@@ -70,9 +71,13 @@ A telemetria é **somente metadados por construção**, e não apenas porque a c
 | Argumentos e resultados MCP | ❌ |
 | Headers de autorização | ❌ |
 | Credenciais / secrets | ❌ |
-| Mensagens de exceção | ❌ |
+| Mensagens de exceção nos adapters A2A/MCP fixos | ❌ |
 
 O sanitizador mantém apenas chaves permitidas, rejeita chaves com aparência de credencial mesmo quando adicionadas explicitamente à allowlist e descarta valores não suportados ou grandes demais. Consulte o [modelo de privacidade](docs/PRIVACY.md).
+
+Spans de aplicação criados pelo consumidor registram exceções por padrão, seguindo o
+comportamento do OpenTelemetry; use `record_exception=False` quando uma exceção puder conter dados
+sensíveis. Consulte a [política de segurança](SECURITY.md) para a fronteira exata.
 
 ## Quickstart em 60 segundos
 
@@ -415,10 +420,14 @@ Comece pelo [índice da documentação](docs/README.md).
 | Demo end-to-end executável | [examples/end_to_end/README.md](examples/end_to_end/README.md) |
 | Integração MCP | [MCP.md](docs/MCP.md) |
 | Modelo de privacidade | [PRIVACY.md](docs/PRIVACY.md) |
+| Política de segurança | [SECURITY.md](SECURITY.md) |
+| Modelo de ameaças | [THREAT_MODEL.md](docs/THREAT_MODEL.md) |
 | Fronteira de observabilidade de LLM | [LLM_OBSERVABILITY.md](docs/LLM_OBSERVABILITY.md) |
 | Integração com governança | [GOVERNANCE.md](docs/GOVERNANCE.md) |
+| Benchmarks de overhead | [benchmarks/README.md](benchmarks/README.md) |
 | Troubleshooting | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
 | Desenvolvimento e releases | [DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+| Como contribuir | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Decisões arquiteturais | [docs/adr/](docs/adr/) |
 
 Exemplos importáveis de adoção estão disponíveis em [`examples/`](examples/).
