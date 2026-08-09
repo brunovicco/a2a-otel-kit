@@ -133,7 +133,7 @@ To rotate credentials:
 
 MCP stdio is outside the current adapter boundary.
 
-The implemented MCP integration targets public Streamable HTTP boundaries through HTTPX and ASGI.
+The implemented MCP integration targets public Streamable HTTP boundaries through HTTPX2 and ASGI.
 
 Do not expect stdio calls to continue W3C HTTP trace context.
 

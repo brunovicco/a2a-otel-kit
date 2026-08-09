@@ -25,10 +25,10 @@ def _load_pyproject() -> dict[str, Any]:
 
 
 def test_project_version_matches_current_release() -> None:
-    """The package version matches the documentation correction release."""
+    """The package version matches the MCP 2.x compatibility release."""
     project = _load_pyproject()
 
-    assert project["project"]["version"] == "0.5.1"
+    assert project["project"]["version"] == "0.6.0"
 
 
 def test_readme_integration_commands_select_integration_tests() -> None:

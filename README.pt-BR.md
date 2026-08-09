@@ -253,8 +253,9 @@ uv add "a2a-otel-kit[mcp]"
 Instrumente as fronteiras públicas de Streamable HTTP:
 
 ```python
-import httpx
+import httpx2
 from mcp.client.streamable_http import streamable_http_client
+from mcp.server import MCPServer
 
 from a2a_otel_kit.adapters.mcp import (
     TracingASGIMiddleware,
@@ -262,16 +263,17 @@ from a2a_otel_kit.adapters.mcp import (
 )
 
 transport = TracingAsyncTransport.wrap(
-    httpx.AsyncHTTPTransport(),
+    httpx2.AsyncHTTPTransport(),
     observability,
 )
 
+mcp_server = MCPServer("service")
 mcp_asgi_app = TracingASGIMiddleware.wrap(
-    fastmcp.streamable_http_app(),
+    mcp_server.streamable_http_app(stateless_http=True, json_response=True),
     observability,
 )
 
-async with httpx.AsyncClient(transport=transport) as http_client:
+async with httpx2.AsyncClient(transport=transport) as http_client:
     async with streamable_http_client(
         url,
         http_client=http_client,
@@ -370,7 +372,7 @@ Leia [Arquitetura](docs/ARCHITECTURE.md) e os [ADRs](docs/adr/).
 O repositório valida mais do que a capacidade de importar o pacote:
 
 - testes unitários cobrem sanitização, ciclo de vida, correlação, concorrência, cancelamento, streaming e privacidade;
-- testes de integração loopback exercitam rotas HTTP oficiais A2A e FastMCP Streamable HTTP usando sockets TCP reais;
+- testes de integração loopback exercitam rotas HTTP oficiais A2A e MCPServer Streamable HTTP usando sockets TCP reais;
 - uma integração opcional com Collector exporta um span e verifica seu recebimento positivo na saída do Collector;
 - a CI testa as versões mínima e mais recente dentro dos limites declarados dos SDKs A2A/MCP em Python 3.13 e 3.14;
 - artefatos de release são inspecionados e submetidos a smoke tests antes da publicação.
@@ -436,7 +438,7 @@ Exemplos importáveis de adoção estão disponíveis em [`examples/`](examples/
 
 - Python: `>=3.13,<3.15`
 - `a2a-sdk`: `>=1.1,<2.0`
-- `mcp`: `>=1.28,<2.0`
+- `mcp`: `>=2.0,<3`
 - OpenTelemetry SDK/exporter: `>=1.43,<2.0`
 
 Os intervalos declarados das dependências opcionais formam o contrato de compatibilidade. A CI verifica tanto as resoluções mínimas quanto as mais recentes dentro desses limites.

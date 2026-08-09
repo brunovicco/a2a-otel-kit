@@ -29,7 +29,7 @@ The root [README](../README.md) is intentionally optimized for discovery and ado
 ## Protocol integrations
 
 - [A2A.md](A2A.md) - official A2A SDK client/server wrapping, streaming behavior, propagation, and limitations.
-- [MCP.md](MCP.md) - Streamable HTTP instrumentation through HTTPX and ASGI public boundaries.
+- [MCP.md](MCP.md) - Streamable HTTP instrumentation through HTTPX2 and ASGI public boundaries.
 
 ## Runtime governance
 

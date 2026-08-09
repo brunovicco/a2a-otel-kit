@@ -3,7 +3,7 @@ import json
 import subprocess
 import sys
 
-import httpx
+import httpx2
 import pytest
 from opentelemetry import context as otel_context
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -44,7 +44,7 @@ def _observability(
     return Observability.configure(settings), exporter
 
 
-class _RecordingTransport(httpx.AsyncBaseTransport):
+class _RecordingTransport(httpx2.AsyncBaseTransport):
     def __init__(self) -> None:
         self.headers: dict[str, str] = {}
         self.closed = False
@@ -54,7 +54,7 @@ class _RecordingTransport(httpx.AsyncBaseTransport):
         self.all_headers: list[dict[str, str]] = []
         self.status_code = 200
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         self.headers = dict(request.headers)
         self.all_headers.append(self.headers)
         self.entered.set()
@@ -62,7 +62,7 @@ class _RecordingTransport(httpx.AsyncBaseTransport):
             await self.release.wait()
         if self.error is not None:
             raise self.error
-        return httpx.Response(self.status_code, content=b"opaque", request=request)
+        return httpx2.Response(self.status_code, content=b"opaque", request=request)
 
     async def aclose(self) -> None:
         self.closed = True
@@ -76,7 +76,7 @@ def test_outbound_injects_operation_span_context_and_preserves_headers(
     transport = TracingAsyncTransport.wrap(inner, observability)
 
     async def scenario() -> None:
-        async with httpx.AsyncClient(transport=transport) as client:
+        async with httpx2.AsyncClient(transport=transport) as client:
             await client.post(
                 "http://mcp.test/mcp", headers={"x-caller": "preserved"}, content=b"secret"
             )
@@ -101,7 +101,7 @@ def test_outbound_replaces_stale_mixed_case_w3c_pair(monkeypatch: pytest.MonkeyP
     inner = _RecordingTransport()
 
     async def scenario() -> None:
-        async with httpx.AsyncClient(
+        async with httpx2.AsyncClient(
             transport=TracingAsyncTransport.wrap(inner, observability)
         ) as client:
             await client.post(
@@ -133,7 +133,7 @@ def test_outbound_replaces_stale_pair_with_coherent_current_tracestate(
     token = otel_context.attach(set_span_in_context(NonRecordingSpan(remote)))
 
     async def scenario() -> None:
-        async with httpx.AsyncClient(
+        async with httpx2.AsyncClient(
             transport=TracingAsyncTransport.wrap(inner, observability)
         ) as client:
             await client.post(
@@ -157,7 +157,7 @@ def test_disabled_outbound_removes_partial_stale_context() -> None:
     inner = _RecordingTransport()
 
     async def scenario() -> None:
-        async with httpx.AsyncClient(
+        async with httpx2.AsyncClient(
             transport=TracingAsyncTransport.wrap(inner, observability)
         ) as client:
             await client.post("http://mcp.test/mcp", headers={"TraceState": "stale=value"})
@@ -182,7 +182,7 @@ def test_outbound_classifies_http_status_without_body_content(
     inner.status_code = status_code
 
     async def scenario() -> None:
-        async with httpx.AsyncClient(
+        async with httpx2.AsyncClient(
             transport=TracingAsyncTransport.wrap(inner, observability)
         ) as client:
             await client.post("http://mcp.test/mcp", content=b"private-body")
@@ -204,7 +204,7 @@ def test_outbound_failure_is_private_and_has_one_terminal_event(
     transport = TracingAsyncTransport.wrap(inner, observability)
 
     async def scenario() -> None:
-        async with httpx.AsyncClient(transport=transport) as client:
+        async with httpx2.AsyncClient(transport=transport) as client:
             with pytest.raises(RuntimeError, match="planted-secret"):
                 await client.post("http://mcp.test/mcp", content=b"private-payload")
 
@@ -229,7 +229,7 @@ def test_outbound_cancellation_restores_context_and_closes_transport(
     transport = TracingAsyncTransport.wrap(inner, observability)
 
     async def scenario() -> None:
-        async with httpx.AsyncClient(transport=transport) as client:
+        async with httpx2.AsyncClient(transport=transport) as client:
             task = asyncio.create_task(client.post("http://mcp.test/mcp"))
             await inner.entered.wait()
             task.cancel("private-cancellation-detail")
@@ -255,7 +255,7 @@ def test_concurrent_outbound_requests_get_distinct_operation_contexts(
     transport = TracingAsyncTransport.wrap(inner, observability)
 
     async def scenario() -> None:
-        async with httpx.AsyncClient(transport=transport) as client:
+        async with httpx2.AsyncClient(transport=transport) as client:
             await asyncio.gather(
                 client.post("http://mcp.test/mcp", headers={"x-request": "one"}),
                 client.post("http://mcp.test/mcp", headers={"x-request": "two"}),

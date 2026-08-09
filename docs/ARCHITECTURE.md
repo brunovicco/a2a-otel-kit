@@ -39,7 +39,7 @@ Adapters implement infrastructure boundaries:
 - `tracing.py` builds an isolated OpenTelemetry provider and OTLP/HTTP exporter.
 - `propagation.py` injects and extracts W3C context through plain string mappings.
 - `a2a.py` wraps the official A2A client and HTTP request-handler contracts.
-- `mcp.py` wraps HTTPX and ASGI public boundaries for MCP Streamable HTTP.
+- `mcp.py` wraps HTTPX2 and ASGI public boundaries for MCP Streamable HTTP.
 
 The A2A and MCP adapters are optional imports. Installing the base package does not import or
 require either SDK. Adapters record fixed operation metadata only; protocol payloads, headers,
@@ -98,7 +98,7 @@ flush/shutdown lifecycle.
 
 - Unit tests cover sanitization, lifecycle, correlation, concurrency, cancellation, streaming,
   privacy, and workflow security without network I/O.
-- Loopback integration tests exercise the official A2A HTTP routes and FastMCP Streamable HTTP
+- Loopback integration tests exercise the official A2A HTTP routes and MCPServer Streamable HTTP
   over real TCP sockets.
 - The Collector integration is opt-in because it requires external infrastructure. It verifies
   positive receipt by finding the emitted span in a Collector file-exporter output, rather than
