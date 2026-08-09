@@ -1,20 +1,28 @@
 services:
   collector:
-    image: otel/opentelemetry-collector-contrib:0.153.0
+    image: otel/opentelemetry-collector-contrib:0.153.0@sha256:93aad750175cbf1a973ae1c5886c3371f4d800f61be25cdd26870b8441ffe9fa
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     ports: ["127.0.0.1:4318:4318"]
     volumes:
       - ./config/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
       - ../../.demo-receipts:/receipts
     depends_on: [tempo]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
   tempo:
-    image: grafana/tempo:2.9.0
+    image: grafana/tempo:2.9.0@sha256:65a5789759435f1ef696f1953258b9bbdb18eb571d5ce711ff812d2e128288a4
     command: ["-config.file=/etc/tempo.yaml"]
     ports: ["127.0.0.1:3200:3200"]
     volumes:
       - ./config/tempo.yaml:/etc/tempo.yaml:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
   grafana:
-    image: grafana/grafana:12.2.0
+    image: grafana/grafana:12.2.0@sha256:74144189b38447facf737dfd0f3906e42e0776212bf575dc3334c3609183adf7
     ports: ["127.0.0.1:3000:3000"]
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
@@ -23,3 +31,7 @@ services:
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on: [tempo]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
