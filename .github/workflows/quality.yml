@@ -107,6 +107,33 @@ jobs:
         if: always()
         run: docker compose -f compose.collector.yml down --volumes --remove-orphans
 
+  end-to-end-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.28"
+          enable-cache: false
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Run end-to-end A2A to MCP demo
+        run: make -C examples/end_to_end demo
+
+      - name: Stop demo stack
+        if: always()
+        run: make -C examples/end_to_end demo-down
+
   sdk-compatibility:
     runs-on: ubuntu-latest
     timeout-minutes: 20

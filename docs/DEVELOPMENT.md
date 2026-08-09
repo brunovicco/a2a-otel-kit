@@ -47,7 +47,8 @@ it only inspects whatever is already in `--dist-dir`, so it always verifies the 
 caller intends to publish. It checks:
 
 - the wheel contains every expected module and `py.typed`;
-- the sdist contains `README.md`, `LICENSE`, `pyproject.toml`, and the full `src`/`tests` tree;
+- the sdist contains `README.md`, `LICENSE`, `pyproject.toml`, and the full
+  `src`/`tests`/`benchmarks` tree;
 - `METADATA`/`PKG-INFO` report the expected name, version, `License-Expression: MIT`,
   `Requires-Python`, and the `a2a`/`mcp` extras;
 - the wheel installs cleanly into three isolated, temporary virtual environments (base, `[a2a]`,

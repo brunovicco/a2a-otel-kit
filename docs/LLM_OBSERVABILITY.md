@@ -25,11 +25,13 @@ directly in a reusable library would:
 
 - `Observability.configure(settings)` builds a real tracer only when
   `settings.enabled=True` and `settings.otlp_endpoint` is set; otherwise every span is a no-op.
-- Spans and structured log events carry only allowlisted, scalar attributes
-  (`sanitize_attributes()` in `domain/attributes.py`) - no prompts, completions, documents, or
-  customer data ever flow through this library's telemetry path, with or without a vendor
-  backend attached. There is no "content capture" flag anywhere in this library because there is
-  no content-capable field to gate.
+- Span and structured-log **attributes** carry only allowlisted scalar values
+  (`sanitize_attributes()` in `domain/attributes.py`). The built-in A2A/MCP adapters also use
+  fixed span names and disable exception recording, so they do not capture prompts, completions,
+  documents, or business payloads. Caller-created application spans are more general: their names
+  are caller-defined and OpenTelemetry exception recording is enabled by default. Use fixed names
+  and `record_exception=False` whenever exception content may be sensitive. There is no dedicated
+  prompt/completion field or content-capture switch in this library.
 - `docs/PRIVACY.md` documents the data this library's telemetry does and does not carry.
 
 ## Where LLM-call-level tracing (cost, tokens, prompts) belongs

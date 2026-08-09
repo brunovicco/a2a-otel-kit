@@ -58,6 +58,15 @@ def test_build_system_pins_hatchling_to_an_exact_version() -> None:
     assert re.fullmatch(r"hatchling==\d+\.\d+\.\d+", requires[0]), requires[0]
 
 
+def test_quality_gate_scans_executable_benchmarks() -> None:
+    """Benchmark tools stay inside lint, typing, and static-security coverage."""
+    project = _load_pyproject()
+
+    quality = project["tool"]["engineering-harness"]["quality"]
+
+    assert quality["source-roots"] == ["src", "benchmarks"]
+
+
 @pytest.mark.parametrize(
     "relative_path",
     [

@@ -12,6 +12,9 @@ The root [README](../README.md) is intentionally optimized for discovery and ado
 | Instrument an A2A client or server | [A2A integration](A2A.md) |
 | Instrument MCP Streamable HTTP | [MCP integration](MCP.md) |
 | Understand what telemetry may contain | [Privacy model](PRIVACY.md) |
+| Review security boundaries and vulnerability reporting | [Security policy](../SECURITY.md) |
+| Review threats, controls, and residual risks | [Threat model](THREAT_MODEL.md) |
+| Measure local telemetry overhead | [Benchmarks](../benchmarks/README.md) |
 | Integrate runtime evidence with governance | [Governance integration](GOVERNANCE.md) |
 | Diagnose export or trace-continuity issues | [Troubleshooting](TROUBLESHOOTING.md) |
 
@@ -20,6 +23,7 @@ The root [README](../README.md) is intentionally optimized for discovery and ado
 - [ARCHITECTURE.md](ARCHITECTURE.md) - layers, dependency direction, runtime flows, and verification boundaries.
 - [PRIVACY.md](PRIVACY.md) - deny-by-default attribute policy and content-capture exclusions.
 - [LLM_OBSERVABILITY.md](LLM_OBSERVABILITY.md) - boundary between operational telemetry and LLM/application artifacts.
+- [THREAT_MODEL.md](THREAT_MODEL.md) - information-disclosure, telemetry-abuse, propagation, and availability threats.
 - [adr/](adr/) - material architectural decisions and trade-offs.
 
 ## Protocol integrations
@@ -38,6 +42,9 @@ The root [README](../README.md) is intentionally optimized for discovery and ado
 ## Development
 
 - [DEVELOPMENT.md](DEVELOPMENT.md) - local setup, quality gates, compatibility checks, packaging, and releases.
+- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) - contributor workflow, adapter guidance, safe attributes, and PR checklist.
+- [`../benchmarks/README.md`](../benchmarks/README.md) - network-free overhead methodology and explicit local OTLP mode.
+- [`../SECURITY.md`](../SECURITY.md) - supported versions, private reporting, and security boundary.
 - [`../AGENTS.md`](../AGENTS.md) - repository engineering contract.
 - [`../CHANGELOG.md`](../CHANGELOG.md) - version history.
 

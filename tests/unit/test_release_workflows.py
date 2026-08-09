@@ -13,6 +13,8 @@ import yaml
 WORKFLOWS_DIR = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 RELEASE_WORKFLOW = WORKFLOWS_DIR / "release.yml"
 QUALITY_WORKFLOW = WORKFLOWS_DIR / "quality.yml"
+END_TO_END_COMPOSE = WORKFLOWS_DIR.parents[1] / "examples" / "end_to_end" / "compose.yml"
+END_TO_END_MAKEFILE = WORKFLOWS_DIR.parents[1] / "examples" / "end_to_end" / "Makefile"
 
 
 def _load(path: Path) -> dict[Any, Any]:
@@ -317,9 +319,78 @@ def test_parallel_auxiliary_jobs_do_not_compete_for_uv_cache_keys() -> None:
     """Matrix and Collector jobs avoid best-effort cache reservation warnings."""
     document = _load(QUALITY_WORKFLOW)
 
-    for job_name in ("build-and-verify", "collector-integration", "sdk-compatibility"):
+    for job_name in (
+        "build-and-verify",
+        "collector-integration",
+        "end-to-end-demo",
+        "sdk-compatibility",
+    ):
         setup = _find_step(document["jobs"][job_name]["steps"], name_contains="Install uv")
         assert setup["with"]["enable-cache"] is False
+
+
+def test_end_to_end_demo_job_runs_the_documented_proof_and_always_cleans_up() -> None:
+    """The README's executable proof is a bounded, blocking CI contract."""
+    document = _load(QUALITY_WORKFLOW)
+    job = document["jobs"]["end-to-end-demo"]
+    steps = job["steps"]
+
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 10
+
+    checkout = _find_step(steps, name_contains="Check out")
+    setup = _find_step(steps, name_contains="Install uv")
+    install_python = _find_step(steps, name_contains="Install Python")
+    install_dependencies = _find_step(steps, name_contains="Install dependencies")
+    run_demo = _find_step(steps, name_contains="Run end-to-end")
+    cleanup = _find_step(steps, name_contains="Stop demo stack")
+
+    assert checkout["uses"] == ("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0")
+    assert setup["uses"] == ("astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b")
+    assert setup["with"] == {"version": "0.11.28", "enable-cache": False}
+    assert install_python["run"] == "uv python install"
+    assert install_dependencies["run"] == "uv sync --frozen --all-groups"
+    assert run_demo["run"] == "make -C examples/end_to_end demo"
+    assert cleanup["if"] == "always()"
+    assert cleanup["run"] == "make -C examples/end_to_end demo-down"
+    assert steps.index(run_demo) < steps.index(cleanup)
+
+
+def test_end_to_end_demo_images_are_versioned_digest_pinned_and_unprivileged() -> None:
+    """Every image executed for pull requests has immutable provenance and reduced privilege."""
+    document = _load(END_TO_END_COMPOSE)
+
+    for service in document["services"].values():
+        image = service["image"]
+        versioned_name, digest = image.split("@sha256:", maxsplit=1)
+
+        assert ":" in versioned_name
+        assert len(digest) == 64
+        assert set(digest) <= set("0123456789abcdef")
+        assert service["security_opt"] == ["no-new-privileges:true"]
+        assert service["cap_drop"] == ["ALL"]
+
+
+def test_end_to_end_collector_uses_host_receipt_owner_and_waits_for_otlp() -> None:
+    """The Collector can write private receipts and must be ready before demo traffic starts."""
+    compose = _load(END_TO_END_COMPOSE)
+    collector = compose["services"]["collector"]
+    makefile = END_TO_END_MAKEFILE.read_text(encoding="utf-8")
+
+    assert collector["user"] == ("${A2A_OTEL_DEMO_UID:-1000}:${A2A_OTEL_DEMO_GID:-1000}")
+    assert "DEMO_UID := $(shell id -u)" in makefile
+    assert "DEMO_GID := $(shell id -g)" in makefile
+    assert "A2A_OTEL_DEMO_UID=$(DEMO_UID)" in makefile
+    assert "A2A_OTEL_DEMO_GID=$(DEMO_GID)" in makefile
+    assert "umask 077" in makefile
+    assert "chmod 0700 $(REPO_ROOT)/.demo-receipts" in makefile
+    assert "chmod 0600 $(REPO_ROOT)/.demo-receipts/traces.jsonl" in makefile
+    assert "curl --fail --silent --show-error" in makefile
+    assert "--connect-timeout 1" in makefile
+    assert "--max-time 2" in makefile
+    assert "ps --status running --services" in makefile
+    assert "grep --quiet --line-regexp collector" in makefile
+    assert "logs collector" in makefile
 
 
 def test_collector_compose_image_is_versioned_and_digest_pinned() -> None:

@@ -14,6 +14,26 @@ independently.
 
 ## [Unreleased]
 
+### Added
+
+- Added a read-only CI job that runs the executable A2A-to-MCP end-to-end demo on every change and
+  always tears down its Compose stack.
+- Added a security policy and threat model covering disclosure, telemetry abuse, trace-context
+  trust, availability, credential handling, and consumer-owned residual risks.
+- Added dependency-free overhead benchmarks for spans, W3C propagation, attribute sanitization,
+  and an explicitly enabled loopback OTLP path, with observed local results and positive Collector
+  receipt evidence.
+- Added a contributor guide for setup, architecture, adapters, safe attributes, required tests,
+  ADR expectations, and pull-request review.
+
+### Security
+
+- Clarified that fixed A2A/MCP adapter spans suppress exception recording while caller-created
+  application spans retain OpenTelemetry's `record_exception=True` default, and that W3C trace
+  context provides correlation rather than authentication.
+- Pinned every CI-executed end-to-end demo image by digest and removed all Linux capabilities from
+  those containers under `no-new-privileges`.
+
 ## [0.5.0] - 2026-08-08
 
 ### Added

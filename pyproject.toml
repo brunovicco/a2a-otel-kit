@@ -81,6 +81,7 @@ packages = ["src/a2a_otel_kit"]
 [tool.hatch.build.targets.sdist]
 only-include = [
     "src/a2a_otel_kit",
+    "benchmarks",
     "tests",
     "examples",
     "compose.collector.yml",
@@ -144,6 +145,7 @@ disallow_untyped_decorators = false
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers -m 'not integration' --cov=src/a2a_otel_kit --cov-report=term-missing"
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = [
     "integration: tests that require real infrastructure",
     "contract: tests that verify an interface contract",
@@ -164,7 +166,7 @@ exclude_dirs = ["tests"]
 skips = []
 
 [tool.engineering-harness.quality]
-source-roots = ["src"]
+source-roots = ["src", "benchmarks"]
 test-roots = ["tests"]
 
 [tool.engineering-harness.architecture]

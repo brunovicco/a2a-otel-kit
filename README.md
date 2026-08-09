@@ -55,7 +55,8 @@ A single request can cross an orchestrator, one or more A2A agents, MCP servers,
 
 ## Privacy by design
 
-Telemetry is **metadata-only by construction**, not merely "content capture disabled by default."
+Built-in A2A/MCP adapter telemetry is **metadata-only by construction**, not merely "content
+capture disabled by default."
 
 | Data | Captured |
 | --- | :---: |
@@ -70,9 +71,13 @@ Telemetry is **metadata-only by construction**, not merely "content capture disa
 | MCP arguments and results | ❌ |
 | Authorization headers | ❌ |
 | Credentials / secrets | ❌ |
-| Exception messages | ❌ |
+| Exception messages in fixed A2A/MCP adapters | ❌ |
 
 The sanitizer keeps only allowlisted keys, rejects credential-like keys even if explicitly added to an allowlist, and drops unsupported or oversized values. See [Privacy model](docs/PRIVACY.md).
+
+Caller-created application spans record exceptions by default, following OpenTelemetry behavior;
+pass `record_exception=False` when an exception may contain sensitive content. See the
+[security policy](SECURITY.md) for the exact boundary.
 
 ## 60-second quickstart
 
@@ -417,10 +422,14 @@ Start with the [documentation index](docs/README.md).
 | Executable end-to-end demo | [examples/end_to_end/README.md](examples/end_to_end/README.md) |
 | MCP integration | [MCP.md](docs/MCP.md) |
 | Privacy model | [PRIVACY.md](docs/PRIVACY.md) |
+| Security policy | [SECURITY.md](SECURITY.md) |
+| Threat model | [THREAT_MODEL.md](docs/THREAT_MODEL.md) |
 | LLM observability boundary | [LLM_OBSERVABILITY.md](docs/LLM_OBSERVABILITY.md) |
 | Governance integration | [GOVERNANCE.md](docs/GOVERNANCE.md) |
+| Overhead benchmarks | [benchmarks/README.md](benchmarks/README.md) |
 | Troubleshooting | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
 | Development and releases | [DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Architectural decisions | [docs/adr/](docs/adr/) |
 
 Importable adoption examples are available under [`examples/`](examples/).
