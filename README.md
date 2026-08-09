@@ -21,7 +21,7 @@ Agentic systems rarely execute inside one process.
 
 A single request can cross an orchestrator, one or more A2A agents, MCP servers, HTTP boundaries, and downstream services. Without explicit trace-context propagation, each hop becomes an isolated telemetry island and debugging turns into correlation by timestamps and guesswork.
 
-`a2a-otel-kit` provides a focused observability boundary for those distributed interactions:
+`a2a-otel-kit` provides a small observability boundary for those distributed interactions:
 
 - OpenTelemetry tracing exported through OTLP/HTTP.
 - W3C `traceparent` and `tracestate` propagation.
@@ -132,23 +132,74 @@ When `enabled=False`, tracing is a no-op and callers do not need branching logic
 
 ## End-to-end trace
 
-A traced interaction can look conceptually like this:
+A real interaction from the executable demo follows this topology:
 
 ```text
 orchestrator
-└── a2a.client.send_message
-    └── risk-agent
-        └── a2a.server.on_message_send
-            └── mcp.client.request
-                └── customer-data-mcp
-                    └── mcp.server.request
+└── demo.risk_assessment
+    └── a2a.client.get_task
+        └── risk-agent / a2a.server.on_get_task
+            ├── mcp.client.streamable_http
+            │   └── customer-data-mcp / mcp.server.streamable_http
+            ├── mcp.client.streamable_http
+            │   └── customer-data-mcp / mcp.server.streamable_http
+            └── ...
 ```
 
-The operation span is created before W3C context is injected, so downstream work continues the same distributed trace.
+The operation span is created before W3C context is injected, allowing downstream A2A and MCP work to continue the same distributed trace.
 
 <p align="center">
   <img src="docs/assets/trace-flow.png" alt="Distributed A2A and MCP trace flow" width="920">
 </p>
+
+### Live end-to-end proof
+
+The repository includes an executable local demo with an Orchestrator, an A2A Risk Agent, a Customer Data MCP service, OpenTelemetry Collector, Tempo, and Grafana.
+
+The 20-second walkthrough shows the demo running, verification passing, and the distributed trace in Grafana:
+
+<p align="center">
+  <img src="docs/assets/demo/demo.gif" alt="End-to-end A2A and MCP observability demo running and displaying the distributed trace in Grafana Tempo" width="1100">
+</p>
+
+The final trace is also available as a static capture:
+
+<p align="center">
+  <img src="docs/assets/demo/trace.png" alt="Real distributed A2A and MCP trace captured with Grafana Tempo" width="1100">
+</p>
+
+In this execution:
+
+- **3 services** participate in the same distributed trace: `orchestrator`, `risk-agent`, and `customer-data-mcp`;
+- the trace contains **11 spans**;
+- A2A client/server context is preserved across the agent boundary;
+- MCP Streamable HTTP client/server context continues the same trace;
+- multiple MCP spans are expected because a real MCP session performs protocol operations in addition to the business tool call;
+- the verifier requires the A2A and MCP spans to resolve to the same `trace_id`;
+- a private business identifier is intentionally present in the business response and verified to be absent from the exported trace telemetry.
+
+Run the proof locally:
+
+```bash
+docker compose -f examples/end_to_end/compose.yml up -d
+uv run python examples/end_to_end/run_demo.py
+uv run python examples/end_to_end/verify_trace.py
+```
+
+A successful verification ends with:
+
+```text
+✓ A2A client span found
+✓ A2A server span found
+✓ MCP client span found
+✓ MCP server span found
+✓ Required spans share one trace_id
+✓ Private business identifier absent from current trace telemetry
+
+Demo verification: PASSED
+```
+
+The demo is intentionally focused: it proves distributed trace continuity across A2A and MCP boundaries and the metadata-only telemetry model. It does not add an LLM, database, agent framework, or cloud dependency merely to make the example more complex.
 
 ## A2A integration
 
@@ -351,7 +402,9 @@ uv run pytest --no-cov -m integration \
 docker compose -f compose.collector.yml down --volumes --remove-orphans
 ```
 
-The Collector test verifies positive receipt by requiring the exported span and service name to appear in Collector output. Endpoint reachability or a successful exporter flush alone is not treated as proof of delivery.
+The Collector test verifies positive receipt by requiring the exported span and service name to
+appear in Collector output. Endpoint reachability or a successful exporter flush alone is not
+treated as proof of delivery.
 
 ## Documentation
 
@@ -361,6 +414,7 @@ Start with the [documentation index](docs/README.md).
 | --- | --- |
 | Architecture and boundaries | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | A2A integration | [A2A.md](docs/A2A.md) |
+| Executable end-to-end demo | [examples/end_to_end/README.md](examples/end_to_end/README.md) |
 | MCP integration | [MCP.md](docs/MCP.md) |
 | Privacy model | [PRIVACY.md](docs/PRIVACY.md) |
 | LLM observability boundary | [LLM_OBSERVABILITY.md](docs/LLM_OBSERVABILITY.md) |
