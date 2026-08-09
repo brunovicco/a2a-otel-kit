@@ -21,7 +21,7 @@ Agentic systems rarely execute inside one process.
 
 A single request can cross an orchestrator, one or more A2A agents, MCP servers, HTTP boundaries, and downstream services. Without explicit trace-context propagation, each hop becomes an isolated telemetry island and debugging turns into correlation by timestamps and guesswork.
 
-`a2a-otel-kit` provides a small observability boundary for those distributed interactions:
+`a2a-otel-kit` provides a focused observability boundary for those distributed interactions:
 
 - OpenTelemetry tracing exported through OTLP/HTTP.
 - W3C `traceparent` and `tracestate` propagation.
@@ -334,6 +334,24 @@ uv run pytest --no-cov -m integration \
   tests/integration/test_a2a_http.py \
   tests/integration/test_mcp_streamable_http.py
 ```
+
+Run the OpenTelemetry Collector receipt test:
+
+```bash
+install -d -m 0777 .collector-receipts
+install -m 0666 /dev/null .collector-receipts/traces.jsonl
+
+docker compose -f compose.collector.yml up -d
+
+A2A_OTEL_KIT_COLLECTOR_ENDPOINT=http://127.0.0.1:4318/v1/traces \
+A2A_OTEL_KIT_COLLECTOR_RECEIPT_FILE=.collector-receipts/traces.jsonl \
+uv run pytest --no-cov -m integration \
+  tests/integration/test_collector_otlp.py
+
+docker compose -f compose.collector.yml down --volumes --remove-orphans
+```
+
+The Collector test verifies positive receipt by requiring the exported span and service name to appear in Collector output. Endpoint reachability or a successful exporter flush alone is not treated as proof of delivery.
 
 ## Documentation
 
