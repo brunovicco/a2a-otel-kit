@@ -249,8 +249,55 @@ HTTP 2xx/3xx responses complete successfully; HTTP 4xx/5xx responses produce an 
 one `failed` event without reading the response body or recording the status response content.
 Stdio and legacy SSE transports are not supported. See ADR-0004.
 
-## Integration tests
+## Governance runtime telemetry sink
 
+Optional, explicit integration with `verifiable-ai-governance` is available through
+`a2a_otel_kit.adapters.governance`. It converts an existing `StructuredEvent` into the closed
+P1.7a runtime-telemetry contract and delivers it without adding Governance behavior to the generic
+`Observability` facade.
+
+```python
+import os
+
+from a2a_otel_kit.adapters.governance import (
+    GovernanceRuntimeTelemetrySettings,
+    GovernanceRuntimeTelemetrySink,
+)
+from a2a_otel_kit.domain.attributes import StructuredEvent, StructuredEventOutcome
+
+settings = GovernanceRuntimeTelemetrySettings(
+    base_url="https://governance.example.com",
+    agent_id="11111111-1111-4111-8111-111111111111",
+    service="decision-agent",
+    environment="production",
+    version="1.0.0",
+)
+sink = GovernanceRuntimeTelemetrySink(
+    settings,
+    credential_provider=lambda: os.environ["GOVERNANCE_RUNTIME_TELEMETRY_API_KEY"],
+)
+
+await sink.emit(
+    StructuredEvent(
+        event_name="decision.completed",
+        event_outcome=StructuredEventOutcome.SUCCESS,
+        attributes={"operation": "decision"},
+    )
+)
+```
+
+The adapter re-sanitizes attributes, ignores unknown/content-bearing keys, captures only valid
+active `trace_id`/`span_id`, and sends the exact closed contract accepted by Governance. Internal
+retries reuse the same `event_id` and serialized body so Governance idempotency remains effective.
+
+The credential is caller-owned and is not retained in the safe-to-represent settings object.
+Remote endpoints require HTTPS; cleartext HTTP is allowed only for loopback development.
+
+Delivery is deliberately explicit rather than wired into `Observability.emit_event()`: emitting a
+local log event must not unexpectedly perform remote I/O. Applications also retain control over
+whether Governance telemetry delivery failures affect the business path. See ADR-0006.
+
+## Integration tests
 The opt-in integration suite includes real loopback TCP tests for the official A2A JSON-RPC
 server routes and FastMCP Streamable HTTP. They use only local ephemeral ports and require no
 external service:
