@@ -14,6 +14,8 @@ independently.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-09
+
 ### Changed
 
 - Moved the optional MCP integration from MCP Python SDK `>=1.28,<2.0` to `>=2.0,<3` and made the
