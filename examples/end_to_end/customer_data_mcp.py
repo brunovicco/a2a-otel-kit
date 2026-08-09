@@ -4,15 +4,15 @@ from typing import cast
 
 import uvicorn
 from common import configure_observability
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from a2a_otel_kit.adapters.mcp import ASGIApp, TracingASGIMiddleware
 
 observability = configure_observability("customer-data-mcp")
-fastmcp = FastMCP("customer-data-demo", stateless_http=True, json_response=True)
+mcp_server = MCPServer("customer-data-demo")
 
 
-@fastmcp.tool()
+@mcp_server.tool()
 def get_customer_risk_score(customer_id: str) -> int:
     """Return the deterministic synthetic risk score used by the demo."""
     del customer_id
@@ -20,7 +20,10 @@ def get_customer_risk_score(customer_id: str) -> int:
 
 
 app = TracingASGIMiddleware.wrap(
-    cast(ASGIApp, fastmcp.streamable_http_app()),
+    cast(
+        ASGIApp,
+        mcp_server.streamable_http_app(stateless_http=True, json_response=True),
+    ),
     observability,
 )
 

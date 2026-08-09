@@ -253,8 +253,9 @@ uv add "a2a-otel-kit[mcp]"
 Instrument public Streamable HTTP boundaries:
 
 ```python
-import httpx
+import httpx2
 from mcp.client.streamable_http import streamable_http_client
+from mcp.server import MCPServer
 
 from a2a_otel_kit.adapters.mcp import (
     TracingASGIMiddleware,
@@ -262,16 +263,17 @@ from a2a_otel_kit.adapters.mcp import (
 )
 
 transport = TracingAsyncTransport.wrap(
-    httpx.AsyncHTTPTransport(),
+    httpx2.AsyncHTTPTransport(),
     observability,
 )
 
+mcp_server = MCPServer("service")
 mcp_asgi_app = TracingASGIMiddleware.wrap(
-    fastmcp.streamable_http_app(),
+    mcp_server.streamable_http_app(stateless_http=True, json_response=True),
     observability,
 )
 
-async with httpx.AsyncClient(transport=transport) as http_client:
+async with httpx2.AsyncClient(transport=transport) as http_client:
     async with streamable_http_client(
         url,
         http_client=http_client,
@@ -370,7 +372,7 @@ Read [Architecture](docs/ARCHITECTURE.md) and the [ADRs](docs/adr/).
 The repository verifies more than importability:
 
 - Unit tests cover sanitization, lifecycle, correlation, concurrency, cancellation, streaming, and privacy.
-- Loopback integration tests exercise the official A2A HTTP routes and FastMCP Streamable HTTP over real TCP sockets.
+- Loopback integration tests exercise the official A2A HTTP routes and MCPServer Streamable HTTP over real TCP sockets.
 - An opt-in Collector integration exports a span and verifies positive receipt from Collector output.
 - CI exercises the minimum and newest bounded A2A/MCP SDK versions on Python 3.13 and 3.14.
 - Release artifacts are inspected and smoke-tested before publication.
@@ -438,7 +440,7 @@ Importable adoption examples are available under [`examples/`](examples/).
 
 - Python: `>=3.13,<3.15`
 - `a2a-sdk`: `>=1.1,<2.0`
-- `mcp`: `>=1.28,<2.0`
+- `mcp`: `>=2.0,<3`
 - OpenTelemetry SDK/exporter: `>=1.43,<2.0`
 
 The declared optional dependency ranges are the compatibility contract. CI checks both minimum and newest bounded resolutions.

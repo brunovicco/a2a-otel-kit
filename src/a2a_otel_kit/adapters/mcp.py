@@ -1,8 +1,8 @@
 """Optional Streamable HTTP tracing for the official MCP Python SDK.
 
-Requires the ``mcp`` extra.  The adapter uses only public boundaries: an HTTPX
+Requires the ``mcp`` extra.  The adapter uses only public boundaries: an HTTPX2
 ``AsyncBaseTransport`` passed to ``streamable_http_client(http_client=...)`` and a generic ASGI
-middleware wrapped around ``FastMCP.streamable_http_app()``.  Request and response bodies are
+middleware wrapped around ``MCPServer.streamable_http_app()``.  Request and response bodies are
 never read or inspected.
 """
 
@@ -14,7 +14,7 @@ from opentelemetry.trace import SpanKind, StatusCode
 
 try:
     version("mcp")
-    import httpx
+    import httpx2
 except (ImportError, PackageNotFoundError) as exc:
     raise ImportError(
         "a2a_otel_kit.adapters.mcp requires the optional 'mcp' extra: install with "
@@ -46,7 +46,7 @@ class Send(Protocol):
 
 
 class ASGIApp(Protocol):
-    """Minimal ASGI application contract returned by FastMCP."""
+    """Minimal ASGI application contract returned by MCPServer."""
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Handle one ASGI scope."""
@@ -78,24 +78,26 @@ def _safe_headers(scope: Scope) -> Mapping[str, str]:
     return carrier
 
 
-class TracingAsyncTransport(httpx.AsyncBaseTransport):
-    """Add W3C propagation and one CLIENT span to an HTTPX async transport."""
+class TracingAsyncTransport(httpx2.AsyncBaseTransport):
+    """Add W3C propagation and one CLIENT span to an HTTPX2 async transport."""
 
-    def __init__(self, inner: httpx.AsyncBaseTransport, observability: ObservabilityFacade) -> None:
+    def __init__(
+        self, inner: httpx2.AsyncBaseTransport, observability: ObservabilityFacade
+    ) -> None:
         """Wrap an existing transport without taking ownership of request bodies."""
         self._inner = inner
         self._observability = observability
 
     @classmethod
     def wrap(
-        cls, inner: httpx.AsyncBaseTransport, observability: ObservabilityFacade
-    ) -> httpx.AsyncBaseTransport:
+        cls, inner: httpx2.AsyncBaseTransport, observability: ObservabilityFacade
+    ) -> httpx2.AsyncBaseTransport:
         """Wrap a transport once, avoiding duplicate instrumentation."""
         if isinstance(inner, cls):
             return inner
         return cls(inner, observability)
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         """Inject trace headers and delegate without reading either HTTP body."""
         with self._observability.start_span(
             _CLIENT_OPERATION,
@@ -110,7 +112,7 @@ class TracingAsyncTransport(httpx.AsyncBaseTransport):
             )
             carrier: dict[str, str] = {}
             inject_trace_context(carrier)
-            # HTTPX headers are case-insensitive. Remove both W3C fields first so a caller's stale
+            # HTTPX2 headers are case-insensitive. Remove both W3C fields first so a caller's stale
             # traceparent cannot be paired with an unrelated tracestate (or vice versa).
             request.headers.pop("traceparent", None)
             request.headers.pop("tracestate", None)
@@ -150,7 +152,7 @@ class TracingASGIMiddleware:
     """Continue W3C context and trace one inbound Streamable HTTP ASGI request."""
 
     def __init__(self, app: ASGIApp, observability: ObservabilityFacade) -> None:
-        """Wrap an ASGI app returned by ``FastMCP.streamable_http_app()``."""
+        """Wrap an ASGI app returned by ``MCPServer.streamable_http_app()``."""
         self._app = app
         self._observability = observability
 

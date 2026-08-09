@@ -14,6 +14,18 @@ independently.
 
 ## [Unreleased]
 
+### Changed
+
+- Moved the optional MCP integration from MCP Python SDK `>=1.28,<2.0` to `>=2.0,<3` and made the
+  outbound Streamable HTTP adapter native to the SDK 2.x `httpx2` transport boundary.
+- Added an explicit MCP 2.x compatibility decision and retained the metadata-only W3C/ASGI
+  security boundary from the original MCP adapter.
+
+### Fixed
+
+- Replaced the misplaced Codex MCP configuration policy in `docs/MCP.md` with the consumer-facing
+  MCP Streamable HTTP integration guide referenced by the README and documentation index.
+
 ## [0.5.1] - 2026-08-09
 
 ### Added

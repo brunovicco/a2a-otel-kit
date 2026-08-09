@@ -1,11 +1,11 @@
 import asyncio
 from typing import cast
 
-import httpx
+import httpx2
 import pytest
 from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 from opentelemetry.trace import SpanKind
 
 from a2a_otel_kit.adapters.mcp import ASGIApp, TracingASGIMiddleware, TracingAsyncTransport
@@ -13,24 +13,30 @@ from tests.integration.conftest import TracedObservability, run_asgi_server
 
 
 @pytest.mark.integration
-def test_fastmcp_streamable_http_propagates_context_over_tcp(
+def test_mcpserver_streamable_http_propagates_context_over_tcp(
     traced_observability: TracedObservability,
 ) -> None:
-    """A real FastMCP session links the client and server spans without exposing content."""
+    """A real MCPServer session links the client and server spans without exposing content."""
     observability = traced_observability.observability
-    fastmcp = FastMCP("integration", stateless_http=True, json_response=True)
+    mcp_server = MCPServer("integration")
 
-    @fastmcp.tool()
+    @mcp_server.tool()
     def echo_length(value: str) -> int:
         """Return only the input length."""
         return len(value)
 
-    app = TracingASGIMiddleware.wrap(cast(ASGIApp, fastmcp.streamable_http_app()), observability)
+    app = TracingASGIMiddleware.wrap(
+        cast(
+            ASGIApp,
+            mcp_server.streamable_http_app(stateless_http=True, json_response=True),
+        ),
+        observability,
+    )
 
     async def scenario(url: str) -> int:
-        transport = TracingAsyncTransport.wrap(httpx.AsyncHTTPTransport(), observability)
+        transport = TracingAsyncTransport.wrap(httpx2.AsyncHTTPTransport(), observability)
         async with (
-            httpx.AsyncClient(transport=transport, timeout=5) as client,
+            httpx2.AsyncClient(transport=transport, timeout=5) as client,
             streamable_http_client(url + "/mcp", http_client=client) as streams,
             ClientSession(streams[0], streams[1]) as session,
         ):
@@ -38,9 +44,9 @@ def test_fastmcp_streamable_http_propagates_context_over_tcp(
             result = await session.call_tool(
                 "echo_length", {"value": "private-integration-payload"}
             )
-            assert not result.isError
-            assert result.structuredContent is not None
-            return int(result.structuredContent["result"])
+            assert not result.is_error
+            assert result.structured_content is not None
+            return int(result.structured_content["result"])
 
     with run_asgi_server(app) as url:
         assert asyncio.run(scenario(url)) == len("private-integration-payload")

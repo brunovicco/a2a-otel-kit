@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0007
 
 ## Context
 
@@ -34,3 +34,6 @@ failed terminal outcome and is re-raised unchanged.
 Consumers explicitly compose the wrappers at the SDK's public boundaries. Stdio, legacy SSE,
 and MCP message-level semantics remain out of scope. The adapter depends on the optional `mcp`
 extra and does not configure global telemetry.
+
+ADR-0007 preserves these privacy and public-boundary decisions while moving the supported client
+transport and SDK contract from MCP 1.x/HTTPX to MCP 2.x/HTTPX2.

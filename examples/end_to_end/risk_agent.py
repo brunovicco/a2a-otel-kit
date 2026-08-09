@@ -3,7 +3,7 @@
 from collections.abc import AsyncGenerator
 from typing import cast
 
-import httpx
+import httpx2
 import uvicorn
 from a2a.server.context import ServerCallContext
 from a2a.server.events.event_queue import Event
@@ -40,12 +40,12 @@ observability = configure_observability("risk-agent")
 async def _lookup_risk_score(customer_id: str) -> int:
     """Read the synthetic customer risk score from the traced MCP service."""
     transport = TracingAsyncTransport.wrap(
-        httpx.AsyncHTTPTransport(),
+        httpx2.AsyncHTTPTransport(),
         observability,
     )
 
     async with (
-        httpx.AsyncClient(transport=transport, timeout=5) as client,
+        httpx2.AsyncClient(transport=transport, timeout=5) as client,
         streamable_http_client(MCP_URL, http_client=client) as streams,
         ClientSession(streams[0], streams[1]) as session,
     ):
@@ -55,10 +55,10 @@ async def _lookup_risk_score(customer_id: str) -> int:
             {"customer_id": customer_id},
         )
 
-        if result.isError or result.structuredContent is None:
+        if result.is_error or result.structured_content is None:
             raise RuntimeError("MCP risk lookup failed")
 
-        return int(result.structuredContent["result"])
+        return int(result.structured_content["result"])
 
 
 class RiskRequestHandler(RequestHandler):
