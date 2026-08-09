@@ -157,7 +157,7 @@ jobs:
 
       - name: Run adapter and loopback integration tests
         run: >-
-          uv run --no-sync pytest -m "integration or not integration"
+          uv run --no-sync pytest --no-cov -m "integration or not integration"
           tests/unit/test_a2a_adapter.py
           tests/unit/test_a2a_adapter_streaming.py
           tests/unit/test_mcp_adapter.py

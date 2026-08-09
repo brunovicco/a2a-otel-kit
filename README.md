@@ -297,7 +297,7 @@ Delivery is deliberately explicit rather than wired into `Observability.emit_eve
 local log event must not unexpectedly perform remote I/O. Applications also retain control over
 whether Governance telemetry delivery failures affect the business path. See ADR-0006.
 
-## Integration tests\n
+## Integration tests
 The opt-in integration suite includes real loopback TCP tests for the official A2A JSON-RPC
 server routes and FastMCP Streamable HTTP. They use only local ephemeral ports and require no
 external service:
