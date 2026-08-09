@@ -24,11 +24,11 @@ def _load_pyproject() -> dict[str, Any]:
         return tomllib.load(handle)
 
 
-def test_project_version_is_0_4_2() -> None:
+def test_project_version_matches_current_release() -> None:
     """The package version matches the documentation correction release."""
     project = _load_pyproject()
 
-    assert project["project"]["version"] == "0.5.0"
+    assert project["project"]["version"] == "0.5.1"
 
 
 def test_readme_integration_commands_select_integration_tests() -> None:

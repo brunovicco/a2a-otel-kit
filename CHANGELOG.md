@@ -14,6 +14,8 @@ independently.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-09
+
 ### Added
 
 - Added a read-only CI job that runs the executable A2A-to-MCP end-to-end demo on every change and
