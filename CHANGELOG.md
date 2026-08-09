@@ -14,6 +14,21 @@ independently.
 
 ## [Unreleased]
 
+### Added
+
+- Added an explicit `a2a_otel_kit.adapters.governance` runtime-telemetry sink for the
+  `verifiable-ai-governance` P1.7a ingestion contract. The adapter re-sanitizes `StructuredEvent`
+  attributes, maps only the closed content-free contract, preserves one `event_id` and serialized
+  body across bounded retries, and captures only valid active trace/span identifiers.
+- Added a minimal Governance sink adoption example and ADR-0006.
+
+### Security
+
+- Governance machine credentials remain outside representable settings and are never included in
+  adapter errors. Remote endpoints require HTTPS, response bodies are never read, and unknown or
+  sensitive event attributes cannot cross the adapter boundary.
+
+
 ## [0.4.2] - 2026-07-17
 
 ### Changed
