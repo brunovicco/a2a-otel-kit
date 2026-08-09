@@ -14,6 +14,8 @@ independently.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-08
+
 ### Added
 
 - Added an explicit `a2a_otel_kit.adapters.governance` runtime-telemetry sink for the
