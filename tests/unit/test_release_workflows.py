@@ -14,6 +14,7 @@ WORKFLOWS_DIR = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 RELEASE_WORKFLOW = WORKFLOWS_DIR / "release.yml"
 QUALITY_WORKFLOW = WORKFLOWS_DIR / "quality.yml"
 END_TO_END_COMPOSE = WORKFLOWS_DIR.parents[1] / "examples" / "end_to_end" / "compose.yml"
+END_TO_END_MAKEFILE = WORKFLOWS_DIR.parents[1] / "examples" / "end_to_end" / "Makefile"
 
 
 def _load(path: Path) -> dict[Any, Any]:
@@ -368,6 +369,28 @@ def test_end_to_end_demo_images_are_versioned_digest_pinned_and_unprivileged() -
         assert set(digest) <= set("0123456789abcdef")
         assert service["security_opt"] == ["no-new-privileges:true"]
         assert service["cap_drop"] == ["ALL"]
+
+
+def test_end_to_end_collector_uses_host_receipt_owner_and_waits_for_otlp() -> None:
+    """The Collector can write private receipts and must be ready before demo traffic starts."""
+    compose = _load(END_TO_END_COMPOSE)
+    collector = compose["services"]["collector"]
+    makefile = END_TO_END_MAKEFILE.read_text(encoding="utf-8")
+
+    assert collector["user"] == ("${A2A_OTEL_DEMO_UID:-1000}:${A2A_OTEL_DEMO_GID:-1000}")
+    assert "DEMO_UID := $(shell id -u)" in makefile
+    assert "DEMO_GID := $(shell id -g)" in makefile
+    assert "A2A_OTEL_DEMO_UID=$(DEMO_UID)" in makefile
+    assert "A2A_OTEL_DEMO_GID=$(DEMO_GID)" in makefile
+    assert "umask 077" in makefile
+    assert "chmod 0700 $(REPO_ROOT)/.demo-receipts" in makefile
+    assert "chmod 0600 $(REPO_ROOT)/.demo-receipts/traces.jsonl" in makefile
+    assert "curl --fail --silent --show-error" in makefile
+    assert "--connect-timeout 1" in makefile
+    assert "--max-time 2" in makefile
+    assert "ps --status running --services" in makefile
+    assert "grep --quiet --line-regexp collector" in makefile
+    assert "logs collector" in makefile
 
 
 def test_collector_compose_image_is_versioned_and_digest_pinned() -> None:

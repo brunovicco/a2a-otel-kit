@@ -1,7 +1,10 @@
 SHELL := /bin/bash
 
 REPO_ROOT := ../..
-COMPOSE := docker compose -f compose.yml
+DEMO_UID := $(shell id -u)
+DEMO_GID := $(shell id -g)
+# Match the Collector to the owner of the bind-mounted receipt without elevating privileges.
+COMPOSE := A2A_OTEL_DEMO_UID=$(DEMO_UID) A2A_OTEL_DEMO_GID=$(DEMO_GID) docker compose -f compose.yml
 PYTHON := uv run python
 
 .PHONY: help demo demo-up demo-run demo-verify demo-down demo-clean demo-reset demo-trace-id demo-status
@@ -28,8 +31,30 @@ demo: demo-up demo-run demo-verify
 	@cat $(REPO_ROOT)/.demo-receipts/last_trace_id.txt
 
 demo-up:
-	@mkdir -p $(REPO_ROOT)/.demo-receipts
+	@umask 077; \
+		mkdir -p $(REPO_ROOT)/.demo-receipts; \
+		touch $(REPO_ROOT)/.demo-receipts/traces.jsonl; \
+		chmod 0700 $(REPO_ROOT)/.demo-receipts; \
+		chmod 0600 $(REPO_ROOT)/.demo-receipts/traces.jsonl
 	$(COMPOSE) up -d
+	@for attempt in {1..30}; do \
+		if curl --fail --silent --show-error \
+			--connect-timeout 1 \
+			--max-time 2 \
+			--header "Content-Type: application/x-protobuf" \
+			--data-binary "" \
+			http://127.0.0.1:4318/v1/traces >/dev/null; then \
+			exit 0; \
+		fi; \
+		if ! $(COMPOSE) ps --status running --services \
+			| grep --quiet --line-regexp collector; then \
+			$(COMPOSE) logs collector; \
+			exit 1; \
+		fi; \
+		sleep 1; \
+	done; \
+	$(COMPOSE) logs collector; \
+	exit 1
 	@echo "Grafana: http://localhost:3000"
 
 demo-run:

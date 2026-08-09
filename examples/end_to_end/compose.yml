@@ -2,6 +2,7 @@ services:
   collector:
     image: otel/opentelemetry-collector-contrib:0.153.0@sha256:93aad750175cbf1a973ae1c5886c3371f4d800f61be25cdd26870b8441ffe9fa
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    user: "${A2A_OTEL_DEMO_UID:-1000}:${A2A_OTEL_DEMO_GID:-1000}"
     ports: ["127.0.0.1:4318:4318"]
     volumes:
       - ./config/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
