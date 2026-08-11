@@ -7,8 +7,8 @@ should be upgraded before a fix is requested.
 
 | Version | Supported |
 | --- | :---: |
-| `0.5.x` | Yes |
-| `< 0.5` | No |
+| `0.6.x` | Yes |
+| `< 0.6` | No |
 
 ## Reporting vulnerabilities
 

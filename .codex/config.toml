@@ -1,6 +1,0 @@
-[shell_environment_policy]
-inherit = "core"
-
-[shell_environment_policy.set]
-PYTHONDONTWRITEBYTECODE = "1"
-PYTHONUNBUFFERED = "1"

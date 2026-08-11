@@ -110,7 +110,7 @@ flush/shutdown lifecycle.
 
 - A2A gRPC context continuity, MCP stdio, and legacy MCP SSE are not supported.
 - Collector deployment and retention are outside this library's scope.
-- The repository `Dockerfile` is a build/smoke artifact for the library; there is no application
-  entrypoint to run.
+- Application containerization is outside this library's scope; the repository provides
+  integration Compose fixtures only where they are required to verify telemetry behavior.
 
 Material decisions are recorded in `docs/adr/`.

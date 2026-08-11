@@ -19,10 +19,10 @@ class Check:
 
 
 def load_settings(root: Path) -> dict[str, object]:
-    """Load harness quality settings from pyproject.toml."""
+    """Load project quality settings from pyproject.toml."""
     with (root / "pyproject.toml").open("rb") as handle:
         project = tomllib.load(handle)
-    return project.get("tool", {}).get("engineering-harness", {}).get("quality", {})
+    return project.get("tool", {}).get("a2a-otel-kit", {}).get("quality", {})
 
 
 def expand_roots(root: Path, patterns: list[str]) -> list[str]:
@@ -51,7 +51,6 @@ def configured_checks(root: Path) -> list[Check]:
         Check("lint", ("ruff", "check", ".")),
         Check("format", ("ruff", "format", "--check", ".")),
         Check("architecture", (sys.executable, "scripts/validate_architecture.py")),
-        Check("mcp", (sys.executable, "scripts/validate_mcp_config.py")),
     ]
     checks.append(Check("typing", ("mypy", *type_roots) if type_roots else ()))
     checks.append(Check("tests", ("pytest",) if test_roots else ()))
