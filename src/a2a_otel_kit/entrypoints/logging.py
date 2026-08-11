@@ -3,8 +3,8 @@
 Call :func:`configure_logging` once, at process startup, before any other code emits a log line.
 Renders JSON to stdout by default; pass ``log_format="console"`` for a human-readable renderer
 during local development. Every log event automatically carries ``trace_id``/``span_id`` when a
-valid OpenTelemetry span is active - callers never bind those manually. Never log secrets,
-personal data, prompts, or model responses - see ``.claude/rules/security-privacy.md``.
+valid OpenTelemetry span is active - callers never bind those manually. Never log
+secrets, personal data, prompts, or model responses.
 """
 
 import logging

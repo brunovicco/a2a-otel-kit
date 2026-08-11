@@ -45,7 +45,6 @@ The root [README](../README.md) is intentionally optimized for discovery and ado
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) - contributor workflow, adapter guidance, safe attributes, and PR checklist.
 - [`../benchmarks/README.md`](../benchmarks/README.md) - network-free overhead methodology and explicit local OTLP mode.
 - [`../SECURITY.md`](../SECURITY.md) - supported versions, private reporting, and security boundary.
-- [`../AGENTS.md`](../AGENTS.md) - repository engineering contract.
 - [`../CHANGELOG.md`](../CHANGELOG.md) - version history.
 
 ## Examples

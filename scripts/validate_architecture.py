@@ -189,9 +189,7 @@ def load_config(root: Path) -> tuple[list[Path], bool, list[Boundary]]:
     """Load source roots and boundaries from pyproject.toml."""
     with (root / "pyproject.toml").open("rb") as handle:
         project = tomllib.load(handle)
-    config: dict[str, Any] = (
-        project.get("tool", {}).get("engineering-harness", {}).get("architecture", {})
-    )
+    config: dict[str, Any] = project.get("tool", {}).get("a2a-otel-kit", {}).get("architecture", {})
     patterns = [str(item) for item in config.get("source-roots", ["src"])]
     source_roots = sorted(
         {

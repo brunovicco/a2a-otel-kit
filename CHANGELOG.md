@@ -14,6 +14,18 @@ independently.
 
 ## [Unreleased]
 
+### Changed
+
+- Simplified repository-level development tooling by moving project-owned
+  quality and architecture configuration out of the generic engineering
+  harness namespace.
+
+### Removed
+
+- Removed Claude Code, Codex, generic agent, MCP-development, container, and
+  engineering-harness scaffolding that was not part of the public
+  `a2a-otel-kit` library.
+
 ## [0.6.0] - 2026-08-09
 
 ### Changed

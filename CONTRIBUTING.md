@@ -1,7 +1,9 @@
 # Contributing
 
 Thank you for improving `a2a-otel-kit`. Keep changes focused, written in English, and aligned with
-the repository engineering contract in [AGENTS.md](AGENTS.md).
+the project architecture and development guidance in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Setup
 

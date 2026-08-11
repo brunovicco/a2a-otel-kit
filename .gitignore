@@ -16,16 +16,21 @@ build/
 # Secrets and local configuration
 .env
 .env.*
-!.env.example
 *.pem
 *.key
 secrets/
 credentials/
 
-# Claude Code local state
+
+# Local AI coding assistants and development tooling
+.claude/
+.codex/
+.agents/
+.harness.json
+AGENTS.md
+CLAUDE.md
 CLAUDE.local.md
-.claude/settings.local.json
-.claude/logs/
+.mcp.json
 
 # Editors and OS
 .DS_Store

@@ -38,7 +38,7 @@ def test_readme_integration_commands_select_integration_tests() -> None:
     assert readme.count("--no-cov -m integration") == 2
 
 
-@pytest.mark.parametrize("relative_path", ["README.md", ".env.example", "examples/README.md"])
+@pytest.mark.parametrize("relative_path", ["README.md", "examples/README.md"])
 def test_documented_collector_endpoints_target_otlp_traces(relative_path: str) -> None:
     """Every local Collector example must use the exporter's concrete traces endpoint."""
     text = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
@@ -62,7 +62,7 @@ def test_quality_gate_scans_executable_benchmarks() -> None:
     """Benchmark tools stay inside lint, typing, and static-security coverage."""
     project = _load_pyproject()
 
-    quality = project["tool"]["engineering-harness"]["quality"]
+    quality = project["tool"]["a2a-otel-kit"]["quality"]
 
     assert quality["source-roots"] == ["src", "benchmarks"]
 

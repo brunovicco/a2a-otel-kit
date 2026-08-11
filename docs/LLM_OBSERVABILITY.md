@@ -4,7 +4,7 @@ This library provides a vendor-neutral OpenTelemetry foundation only: tracing, W
 propagation, structured JSON logging, and privacy-safe attribute sanitization, all emitting
 standard OTLP over HTTP. **It does not contain, and will not add, a Langfuse, Datadog, or any
 other vendor-specific SDK.** That constraint is deliberate, not an oversight - see
-`AGENTS.md` and `.claude/rules/security-privacy.md`.
+`docs/ARCHITECTURE.md` and `docs/PRIVACY.md`.
 
 ## Why not a Langfuse/Datadog adapter here
 

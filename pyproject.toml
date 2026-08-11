@@ -165,10 +165,10 @@ fail_under = 80
 exclude_dirs = ["tests"]
 skips = []
 
-[tool.engineering-harness.quality]
+[tool.a2a-otel-kit.quality]
 source-roots = ["src", "benchmarks"]
 test-roots = ["tests"]
 
-[tool.engineering-harness.architecture]
+[tool.a2a-otel-kit.architecture]
 source-roots = ["src"]
 clean-architecture = true
